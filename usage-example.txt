@@ -1,0 +1,47 @@
+% export PUNCH_DIR="$HOME/.punch-tmp"
+% punch-in   
+punch-in: no tasks found
+% cat >~/.punch-tmp/tasks
+SomeTask 1234 whatever comment you want - maybe the project name
+Task2 112 The number is an issue_id. Steal it from your issue tracker.
+DoSomething 42 Death March
+% punch-in 
+select a task:
+0: SomeTask (whatever comment you want - maybe the project name)
+1: Task2 (The number is an issue_id. Steal it from your issue tracker.)
+2: DoSomething (Death March)
+2
+% ls ~/.punch-tmp 
+current  tasks
+% cat ~/.punch-tmp/current 
+42 1330810079
+% punch-now
+punch-now: DoSomething/42 (Death March) - 0:00:31
+% punch-in 
+select a task:
+0: SomeTask (whatever comment you want - maybe the project name)
+1: Task2 (The number is an issue_id. Steal it from your issue tracker.)
+2: DoSomething (Death March)
+1
+punch-out: DoSomething/42 (Death March) - 0:00:47
+% punch-now
+punch-now: Task2/112 (The number is an issue_id. Steal it from your issue tracker.) - 0:00:08
+% cat ~/.punch-tmp/current 
+112 1330810121
+% punch-out
+punch-out: Task2/112 (The number is an issue_id. Steal it from your issue tracker.) - 0:00:15
+% punch-now     
+punch-now: no current task
+% ls ~/.punch-tmp 
+tasks      timesheet
+% cat ~/.punch-tmp/timesheet 
+# DoSomething/42 (Death March)
+42 1330810079 1330810126
+
+# Task2/112 (The number is an issue_id. Steal it from your issue tracker.)
+112 1330810121 1330810136
+
+% punch-summary
+2012-03-03 0.5 112 Task2 (The number is an issue_id. Steal it from your issue tracker.)
+2012-03-03 0.5 42 DoSomething (Death March)
+% unset PUNCH_DIR

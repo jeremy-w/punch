@@ -1,0 +1,312 @@
+#!/usr/bin/python
+# vi: set et ts=4 sw=4 :
+"""
+Implements two tools for time tracking:
+
+- punch-in -- gives you a selection of tasks and starts
+  timing the one you choose
+- punch-out -- looks up the current task, calculates the time elapsed,
+  and appends that info to the timesheet
+
+Files stored under $PUNCH_DIR (default ~/.punch):
+
+- tasks -- the list of tasks
+
+  The file format is three space-delimited fields:
+
+    - task id
+    - task name
+    - comment (optional)
+
+- current -- the current task and its start time
+
+  The file format is '<task-id> <start-timestamp>'.
+
+- timesheet -- an append-only log of time entries
+
+  The file format treats lines beginning with # as a comment.
+  Blank lines are also ignored. The lines that matter have two
+  space-delimited fields:
+
+    - task id
+    - start timestamp
+    - end timestamp
+
+"""
+
+import errno
+import os
+import re
+import sys
+import time
+
+
+HOME = os.getenv('HOME', '~')
+PUNCH_DIR = os.getenv('PUNCH_DIR', os.path.join(HOME, '.punch'))
+TASKS_PATH = os.path.join(PUNCH_DIR, 'tasks')
+TIMESHEET_PATH = os.path.join(PUNCH_DIR, 'timesheet')
+CURRENT_TASK_PATH = os.path.join(PUNCH_DIR, 'current')
+
+
+class Task(object):
+    def __init__(self, name, id, comment=''):
+        self.name = name
+        self.id = int(id)
+        self.comment = comment
+        self.time_start = time.time()
+        self.time_stop = self.time_start
+
+    def __repr__(self):
+        return 'Task(%s, %d, %s)' % (self.name, self.id, self.comment)
+
+    def __str__(self):
+        return '%s/%s (%s)' % (self.name, self.id, self.comment)
+
+    def punch_in(self):
+        """Punches in.
+
+        WARNING: This overwrites CURRENT_TASK_PATH.
+        Be sure to punch out any current task.
+
+        """
+        entry = '%d %d\n' % (self.id, self.time_start)
+        f = open(CURRENT_TASK_PATH, 'w')
+        f.write(entry)
+        f.close()
+
+    def punch_out(self):
+        f = open(TIMESHEET_PATH, 'a')
+        entry = '# %s\n%d %d %d\n\n' \
+            % (self, self.id, self.time_start, self.time_stop)
+        f.write(entry)
+        f.close()
+
+        ctask = current_task()
+        if ctask and ctask.id == self.id:
+            os.unlink(CURRENT_TASK_PATH)
+
+    def seconds(self):
+        return self.time_stop - self.time_start
+
+    def day(self):
+        info = time.localtime(self.time_start)
+        return time.strftime('%Y-%m-%d', info)
+
+    @classmethod
+    def find(cls, id):
+        tasks = read_tasks()
+        task = None
+        for t in tasks:
+            if t.id == id:
+                task = t
+                break
+        return task
+
+
+def read_tasks():
+    if not os.path.exists(TASKS_PATH):
+        return []
+
+    tasks = list()
+    f = open(TASKS_PATH)
+    line = f.readline().strip()
+    i = 1
+    while line:
+        line = line.strip()
+        line = re.sub('\s+', ' ', line)
+        vals = line.split(' ', 2)
+        try:
+            task = Task(*vals)
+            tasks.append(Task(*vals))
+        except:
+            print 'punch-in: error:%s:%d: bad format: %s'\
+                (TASKS_PATH, i, line)
+            return []
+        line = f.readline()
+        i += 1
+    f.close()
+    return tasks
+
+
+def current_task():
+    if not os.path.exists(CURRENT_TASK_PATH):
+        return None
+
+    f = open(CURRENT_TASK_PATH)
+    line = f.readline()
+    f.close()
+    if not line:
+        return None
+
+    (task_id, start) = line.split()
+    task_id = int(task_id)
+    start = int(start)
+
+    task = Task.find(task_id)
+    if not task:
+        print 'error: current task id %d matches no task'\
+            % (task_id)
+        return None
+
+    task.time_start = start
+    task.time_stop = time.time()
+    return task
+
+
+def main_punch_in():
+    tasks = read_tasks()
+    if not tasks:
+        print 'punch-in: no tasks found'
+        return
+
+    print "select a task:"
+    for i, task in enumerate(tasks):
+        print '%d: %s (%s)' % (i, task.name, task.comment)
+    line = raw_input()
+    choice = int(line)
+    task = tasks[choice]
+
+    main_punch_out(False)
+    task.punch_in()
+
+
+def main_punch_now():
+    task = current_task()
+    if task:
+        hours, mins, secs = seconds_to_hours(task.seconds())
+        print 'punch-now: %s - %d:%02d:%02d' % (task, hours, mins, secs)
+    else:
+        print 'punch-now: no current task'
+
+def seconds_to_hours(secs):
+    mins = int(secs) / 60
+    secs -= 60*mins
+    hours = mins / 60
+    mins -= 60*hours
+    return (hours, mins, secs)
+
+
+def main_punch_out(warn=True):
+    task = current_task()
+    if task:
+        task.punch_out()
+        hours, mins, secs = seconds_to_hours(task.seconds())
+        print 'punch-out: %s - %d:%02d:%02d' % (task, hours, mins, secs)
+    elif warn:
+        print 'punch-out: no current task'
+
+
+def timesheet_tasks(path=TIMESHEET_PATH):
+    if not os.path.exists(path):
+        print 'punch-summary: timesheet #{TIMESHEET_PATH} does not exist'
+        return
+    f = open(path)
+    line = f.readline()
+    tasks = []
+    i = 0
+    while line:
+        i += 1
+        if line.startswith('#'):
+            line = f.readline()
+            continue
+        line = line.strip()
+        if not line:
+            line = f.readline()
+            continue
+
+        parts = line.split()
+        if len(parts) != 3:
+            print 'punch-summary: error:%s:%d: %s - expected 3 parts'\
+                % (path, i, line)
+            line = f.readline()
+            continue
+        (task_id, start, stop) = parts
+        task_id = int(task_id)
+        start = float(start)
+        stop = float(stop)
+        try:
+            task = Task.find(task_id)
+            if not task:
+                print 'punch-summary: task %d not found' % (task_id)
+            task.time_start = start
+            task.time_stop = stop
+            tasks.append(task)
+        except Exception as e:
+            print 'punch-summary: error:%s:%d: %s - %s'\
+                % (path, i, line, e)
+            return []
+        line = f.readline()
+    return tasks
+
+
+def main_punch_summary():
+    tasks = timesheet_tasks()
+    if not tasks:
+        print 'punch-summary: no entries found'
+        return
+
+    # group by start date
+    tasks_by_day = []
+    day = tasks[0].day()
+    day_tasks = []
+    for task in tasks:
+        if task.day() == day:
+            day_tasks.append(task)
+        else:
+            print '%s != %s' % (task.day(), day)
+            day = task.day()
+            if day_tasks: tasks_by_day.append(day_tasks)
+            day_tasks = [task]
+    if day_tasks:
+        tasks_by_day.append(day_tasks)
+
+    # reduce to one task entry per day
+    def combine_time(id_map, task):
+        canon = id_map.get(task.id, None)
+        if canon:
+            canon.time_stop += task.seconds()
+        else:
+            id_map[task.id] = task
+        return id_map
+
+    summary_tasks_by_day = []
+    for group in tasks_by_day:
+        tasks_by_id = reduce(combine_time, group, dict())
+        tasks = tasks_by_id.values()
+        summary_tasks_by_day.append(tasks)
+
+    # report
+    def format_task(task):
+        (hours, mins, secs) = seconds_to_hours(task.seconds())
+        h = float(hours)
+        if mins > 30:
+            h += 1
+        elif mins > 0 or secs > 0:
+            h += 0.5
+        desc = '%s %0.1f %s %s (%s)' \
+            % (task.day(), h, task.id, task.name, task.comment)
+        return desc
+    for group in summary_tasks_by_day:
+        day = group[0].day()
+        for task in group:
+            print format_task(task)
+
+def main():
+    name = sys.argv[0]
+    if name.endswith('in'):
+        main_punch_in()
+    elif name.endswith('out'):
+        main_punch_out()
+    elif name.endswith('mary'):
+        main_punch_summary()
+    else:
+        main_punch_now()
+
+
+if __name__ == "__main__":
+    try:
+        os.mkdir(PUNCH_DIR)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+    main()
