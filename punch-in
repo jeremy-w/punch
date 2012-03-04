@@ -245,6 +245,9 @@ def main_punch_summary():
         print 'punch-summary: no entries found'
         return
 
+    # sort by start date
+    tasks.sort(key=lambda t: t.time_start)
+
     # group by start date
     tasks_by_day = []
     day = tasks[0].day()
