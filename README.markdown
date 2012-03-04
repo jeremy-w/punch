@@ -7,6 +7,21 @@ Yes, they are all named Punch.
 
 See the section at the end of the document for a survey of the others.
 
+This `punch` is distinguished by:
+
+* Its extreme **simplicity**: `punch` draws from a list of tasks (`punch
+  tasks`, `punch in`), tracks your current task (`punch now`), and appends it
+  to a timesheet file when you clock out (`punch out`, `punch times`).
+* Its **human-editable** file format. No XML fake human-friendly broken
+  promises here.
+* Its ISO 8601 **standards-based** representation of times and durations.
+* Its **minimalist** concept of a task: one-word name, start time,
+  duration, and a free-form comment in which you can encode whatever other info
+  you need or want.
+* Its **refusal** to be all things. Small and focused is more malleable than a
+  Swiss army knife of tools. Make your data simple enough, and you can slice
+  and dice it however you want using a pipeline to other tools.
+
 ## Why
 Because I failed to do due diligence and use existing tools.
 
