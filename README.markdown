@@ -1,5 +1,5 @@
 # Punch
-
+<!-- vi: set et ts=2 sw=2 : -->
 ## What
 Yet another commandline time tracking tool.
 
@@ -12,21 +12,21 @@ Because I failed to do due diligence and use existing tools.
 
 Because I thought, "How hard could this be?"
 
+Because I wanted something whose file format was dead stupid so I could
+watch over its shoulder or hand-edit as needed. Check out the head of
+`punch-in` for a complete description of the format used in the three files.
+
 Because I wanted something whose output I could readily
 feed into [Redminer](https://github.com/jeremy-w/redminer):
 
     awk '{gsub("-", "/", $1); printf("%s %s %s\n", $1, $2, $3)}' \
         <(punch-summary) | xargs -n 3 redminer time post
 
-Because I wanted something whose file format was dead stupid so I could
-watch over its shoulder or hand-edit as needed. Check out the head of
-`punch-in` for a complete description of the format used in the three files.
-
 ## How
 Symlink `punch-in` to `punch-out`, `punch-now`, and `punch-summary`.
 Then just call the right tool from the commandline.
 
-If you're already punched-in, punch-in will punch-out and then punch-in.
+If you're already punched-in, punch-in will punch-out before punching in.
 
 ## Example
 ```shell
@@ -83,10 +83,11 @@ tasks      timesheet
 * Switch the timestamps for ISO dates, because they're easier to edit directly.
 * Document the overall system behavior.
 * Allow summarizing an arbitrary timesheet file.
-* Allow limiting the summary to a time period (`--from`, `--till`).
-* Allow adding tasks with a command rather than hand-editing the tasks file.
+* ~~Allow limiting the summary to a time period (`--from`, `--till`).~~
+    - Nevermind, this is what `grep` is for.
 * Allow marking tasks as done so they are excluded from the punch-in task list.
   (They still need to be there for the summaries to work.)
+* Allow adding tasks with a command rather than hand-editing the tasks file.
 
 ## The Other Punches
 You might want to check the others out:
