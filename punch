@@ -273,20 +273,25 @@ class Path(object):
     HOME = unicode(os.getenv("HOME", u"~"))
     """The user's home directory."""
 
-    PUNCH = os.path.join(HOME, u".punch/")
-    """The default punch directory, ~/.punch."""
+    PUNCH_DIR_DEFAULT = os.path.join(HOME, u".punch/")
+    """The default root directory $PUNCHDIR (normally ~/.punch)."""
+
+    PUNCH_DIR = unicode(os.getenv("PUNCH_DIR", PUNCH_DIR_DEFAULT))
+    """The root directory - default can be overridden by environment."""
 
     def __init__(self, tasks=u"tasks", times=u"times", current=u"current",\
-        root=PUNCH):
+        root=PUNCH_DIR):
         """Returns a new Path instance.
 
         Assigns root/{tasks,times,current} to the
         tasks, times, and current attributes.
+
+        If root is None, uses PUNCH_DIR.
         """
-        self.root = root
-        self.tasks = os.path.join(root, tasks)
-        self.times = os.path.join(root, times)
-        self.current = os.path.join(root, current)
+        self.root = root if root else type(self).PUNCH_DIR
+        self.tasks = os.path.join(self.root, tasks)
+        self.times = os.path.join(self.root, times)
+        self.current = os.path.join(self.root, current)
 
     def __repr__(self):
         return u'Path(tasks=%s, times=%s, current=%s, root=%s)'\
