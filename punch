@@ -299,7 +299,12 @@ class Path(object):
 
     @staticmethod
     def backup(path):
-        """Backs up dir/file to dir/.file~."""
+        """Backs up 'path' to '.path~'.
+
+        Does nothing if path does not exist.
+        """
+        if not os.path.exists(path):
+            return
         parent = os.path.dirname(path)
         fnam = os.path.basename(path)
         target_name = u''.join(['.', fnam, '~'])
