@@ -21,7 +21,7 @@ Unify file access around the notion of de/serializing Tasks.
 The parser knows to skip blank lines and comment lines:
     parser = FileParser(path)
     parser.readTasks()
-    parser.writeTasks(tasks)
+    parser.writeTasks(tasks, fileobj)
 
 Write out entire task in all files. No need for a comprehensive task database.
 This should be a SIMPLE tool, not your average billing department mess.
