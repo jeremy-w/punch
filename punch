@@ -20,9 +20,12 @@ Punch's file format:
 - uses ISO 8601 formatting and UTC throughout
 - Unicode-friendly thanks to UTF-8
 """
+import argparse
 import codecs
 from datetime import datetime
+import os
 import re
+import sys
 
 
 class Task(object):
@@ -37,9 +40,9 @@ class Task(object):
     """
     def __init__(self, name, start, duration, comment=u''):
         self.name = unicode(name)
-        self.start = start
-        self.duration = float(duration)
-        self.comment = unicode(comment)
+        self.start = start if start else datetime.utcnow()
+        self.duration = float(duration) if duration else 0
+        self.comment = unicode(comment) if comment else u''
 
 
 class TaskStream(object):
@@ -104,16 +107,17 @@ class TaskStream(object):
             return None
 
         match = cls.timeless_regex.match(line) or\
-            cls.timefree_regex.match(line)
+            cls.timed_regex.match(line)
         if not match:
             raise FormatError("bad task format", line, lineno)
 
-        name = match.group('name')
-        start = match.group('start')
+        group = match.groupdict()
+        name = group.get('name')
+        start = group.get('start')
         if start: start = ISO.to_datetime(start)
-        duration = match.group('duration')
+        duration = group.get('duration')
         if duration: duration = ISO.duration_to_seconds(duration)
-        comment = match.group('comment') or u''
+        comment = group.get('comment') or u''
         task = Task(name, start, duration, comment)
         return task
 
@@ -176,8 +180,8 @@ class ISO(object):
             group['hour'], group['minute'], group['second'])
         return dt
 
-    @staticmethod
-    def from_datetime(datetime):
+    @classmethod
+    def from_datetime(cls, datetime):
         """Returns an ISO-8601-formatted string corresponding to datetime."""
         parts = (datetime.year, datetime.month, datetime.day,
             datetime.hour, datetime.minute, datetime.second)
@@ -224,9 +228,24 @@ class ISO(object):
 
 
 class Path(object):
-    """Path is a place to stuff all the paths used by punch.
-    A single global instance exists at runtime."""
-    pass
+    """Path is a place to stuff all the paths used by punch."""
+
+    HOME = unicode(os.getenv("HOME", u"~"))
+    """The user's home directory."""
+
+    PUNCH = os.path.join(HOME, u".punch/")
+    """The default punch directory, ~/.punch."""
+
+    def __init__(self, tasks=u"tasks", times=u"times", current=u"current",\
+        root=PUNCH):
+        """Returns a new Path instance.
+
+        Assigns root/{tasks,times,current} to the
+        tasks, times, and current attributes.
+        """
+        self.tasks = os.path.join(root, tasks)
+        self.times = os.path.join(root, times)
+        self.current = os.path.join(root, current)
 
 
 class Error(Exception):
@@ -238,12 +257,76 @@ class FormatError(Error):
     def __init__(self, message, line=None, lineno=None):
         self.message = message
         self.line = line
-        self.lineno = lineno
+        self.lineno = unicode(lineno)
 
     def __str__(self):
-        parts = [self.line]
+        parts = [self.message]
         if self.lineno:
-            parts.insert(self.lineno, 0)
+            parts.insert(0, self.lineno)
         if self.line:
             parts.append(self.line)
         return u": ".join(parts)
+
+
+class Punch(object):
+    """Carries out the standard punch operations."""
+
+    def __init__(self, path=Path()):
+        self.path = path
+        desc = u"The time tracker distinguished by its good taste."
+        self.parser = argparse.ArgumentParser(description=desc)
+        subparsers = self.parser.add_subparsers()
+
+        tasks_parser = subparsers.add_parser('tasks')
+        tasks_parsers = tasks_parser.add_subparsers()
+
+        tasks_list_parser = tasks_parsers.add_parser('list')
+        tasks_list_parser.set_defaults(run=self.tasks_list)
+
+        tasks_add_parser = tasks_parsers.add_parser('add')
+        tasks_add_parser.set_defaults(run=self.tasks_add)
+        tasks_add_parser.add_argument('name', type=unicode,
+            help="the new task's name - any space will be replaced by '-'")
+        tasks_add_parser.add_argument('comment', nargs='*', type=unicode,
+            help="the new task's comment (one line)")
+
+        tasks_remove_parser = tasks_parsers.add_parser('remove')
+        tasks_remove_parser.set_defaults(run=self.tasks_remove)
+        tasks_remove_parser.add_argument('name-glob', nargs='+', type=unicode,
+            help="the name of the task or tasks to remove")
+        tasks_remove_parser.add_argument('--force', '-f', action='store_true',
+            help="do not confirm the tasks to be removed")
+
+    def handle(self, args):
+        """Handles args as if provided on the commandline."""
+        args = self.parser.parse_args(args)
+        args.run(args)
+
+    def tasks_list(self, args):
+        with codecs.open(self.path.tasks, 'r', 'utf-8') as f:
+            tasks = []
+            try:
+                tasks = TaskStream.read(f)
+            except Error as e:
+                print u'%s: %s:%s' % (self.parser.prog, self.path.tasks, e)
+                return
+            for task in tasks:
+                print u'%s / %s' % (task.name, task.comment)
+
+    def tasks_add(self, args):
+        pass
+
+    def tasks_remove(self, args):
+        pass
+
+
+def main():
+    punch = Punch()
+    try:
+        punch.handle(sys.argv[1:])
+    except KeyboardInterrupt:
+        return
+
+
+if __name__ == "__main__":
+    main()

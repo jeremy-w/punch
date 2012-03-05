@@ -1,17 +1,22 @@
 ## Desired Interface
+name-glob below means a name optionally including '*' for any chars and
+'?' for a single char. '\' is an escape character.
 
-    punch tasks (dumps path as comment followed by contents)
+    punch tasks list
+    punch tasks add/new name and the rest is comments
+    punch tasks remove/del/rm -f/--force name-glob name-glob name-glob
 
-cat $(punch tasks | head -1)
-vim $(punch tasks | head -1)
+`--force` prevents asking for confirmation prior to deletion.
 
     punch in name-glob
 list tasks matching, or if just 1, declare it; no task lists all to choose from
 
     punch out comment
 
-    punch times
-    punch times edit
+    punch times (dumps path as comment followed by contents)
+
+Invoke as `punch times file` or `punch times -` to dump from that source
+and validate its format.
 
 ## DRY Up Code
 Unify file access around the notion of de/serializing Tasks.
