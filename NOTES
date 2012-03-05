@@ -1,0 +1,59 @@
+## Desired Interface
+
+    punch tasks (dumps path as comment followed by contents)
+
+cat $(punch tasks | head -1)
+vim $(punch tasks | head -1)
+
+    punch in name-glob
+list tasks matching, or if just 1, declare it; no task lists all to choose from
+
+    punch out comment
+
+    punch times
+    punch times edit
+
+## DRY Up Code
+Unify file access around the notion of de/serializing Tasks.
+
+    Task.parse(), Task.format()
+
+The parser knows to skip blank lines and comment lines:
+    parser = FileParser(path)
+    parser.readTasks()
+    parser.writeTasks(tasks)
+
+Write out entire task in all files. No need for a comprehensive task database.
+This should be a SIMPLE tool, not your average billing department mess.
+
+A task is just:
+
+    one-word-name start-time/duration free-form comment till end of line
+
+    tps-report 2012-02-25T17:35:45Z/PT12H05M36S man this sucks
+
+Last 3 are optional. If you want a default comment, just do
+
+    name / whatever your comment is
+
+in tasks.
+
+## New Arch
+* Task -- name, start, duration, comment
+
+    ^(\S+)\s*([^/]+)/(\S+)\s*(.+)$
+
+* TaskStream -- skips comment and blank lines
+    - read(fileobj)
+    - write(taskseq)
+
+* ISO -- handles ISO formatting, UTC->local conversions for summary
+    - now() -- current date-time in UTC
+    - duration(start=, stop=, duration=) supply any two, it returns the third
+    - local(datetime) -- converts to local time
+
+* Path -- global again -- config but named better
+* Switch back to procedural code for the commands:
+    - punch_in(glob), punch_out(), punch_now(), punch_times free functions
+    - parse ourselves rather than messing with argparse(), since we don't have
+      any switches
