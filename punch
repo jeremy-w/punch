@@ -319,6 +319,12 @@ class Punch(object):
                     u"%s: error: cannot create punch directory %s: %s"\
                     % (self.parser.prog, self.path.root, e)
 
+        self.add_tasks_parser(subparsers)
+
+    def add_tasks_parser(self, subparsers):
+        """Adds the parser tree responsible for handling
+        `punch tasks` using the |subparsers| factory.
+        """
         tasks_parser = subparsers.add_parser('tasks')
         tasks_parsers = tasks_parser.add_subparsers()
 
