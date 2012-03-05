@@ -150,7 +150,8 @@ class TaskStream(object):
         if start:
             start = ISO.from_datetime(start)
             if not duration: duration = 0
-        if duration: duration = ISO.seconds_to_duration(duration)
+        if duration is not None:
+            duration = ISO.seconds_to_duration(duration)
 
         string = cls.timed_format % (name, start, duration, comment) if start\
             else cls.timeless_format % (name, comment)
@@ -160,6 +161,7 @@ class TaskStream(object):
 class ISO(object):
     """ISO handles conversion between formatted strings and
     datetimes (for date-times) and floats (for durations).
+    It also handles converting between duration formats.
 
     ISO only creates a duration with components of accurate duration (hour,
     minute, second, but supports reading durations with components of nominal
@@ -187,8 +189,10 @@ class ISO(object):
             raise FormatError("expected UTC ISO 8601 datetime", isostring)
 
         group = match.groupdict()
-        dt = datetime(group['year'], group['month'], group['day'],
-            group['hour'], group['minute'], group['second'])
+        vals = [group['year'], group['month'], group['day'],
+            group['hour'], group['minute'], group['second']]
+        vals = [int(val) for val in vals]
+        dt = datetime(*vals)
         return dt
 
     @classmethod
@@ -212,14 +216,14 @@ class ISO(object):
         if not match or not match.groups():
             raise FormatError("expected UTC ISO 8601 duration", isostring)
         group = match.groupdict()
-        year = group['Y'] or 0
-        month = group['M'] or 0
-        day = group['D'] or 0
-        hour = group['TH'] or 0
-        minute = group['TM'] or 0
-        second = group['TS'] or 0
-        seconds = second + 60*(minute + 60*(hour +
-            24*(day + 30*(month + 12*year))))
+        year = int(group['Y'] or 0)
+        month = int(group['M'] or 0)
+        day = int(group['D'] or 0)
+        hour = int(group['TH'] or 0)
+        minute = int(group['TM'] or 0)
+        second = float(group['TS'] or 0.0)
+        seconds = second + 60.0*(minute + 60.0*(hour +
+            24.0*(day + 30.0*(month + 12.0*year))))
         return seconds
 
     @staticmethod
@@ -236,6 +240,31 @@ class ISO(object):
         # seconds, even if it's just 00S.
         parts.append(u"%02dS" % second)
         return u"".join(parts)
+
+    @staticmethod
+    def duration(start=None, stop=None, duration=None):
+        """Supply any two, it computes and returns the third.
+
+        start and stop should be Python datetimes.
+        duration should be a Python float.
+
+        Raises Error if other than 2 args are supplied."""
+        count = len([a for a in [start, stop, duration] if a is not None])
+        if count != 2:
+            raise Error(u"ISO.duration: expected exactly 2 args, %d supplied"\
+                % count)
+        if not start:
+            start = stop + datetime.timedelta(seconds=-duration)
+            return start
+        if not stop:
+            stop = start + datetime.timedelta(seconds=duration)
+            return stop
+        if not duration:
+            delta = stop - start
+            duration = delta.seconds + 3600*delta.days
+            if delta.microseconds:
+                duration += 1
+            return duration
 
 
 class Path(object):
