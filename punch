@@ -21,10 +21,13 @@ Punch's file format:
 - Unicode-friendly thanks to UTF-8
 """
 import argparse
-import codecs
 from datetime import datetime
+import fnmatch
+import io
 import os
 import re
+from StringIO import StringIO
+import shutil
 import sys
 
 
@@ -34,15 +37,21 @@ class Task(object):
 
     The start time is stored as a datetime.
     Duration is in seconds.
+    Comment is optional and defaults to the empty unicode string.
 
     Use ISO to format this info.
     Use TaskStream to read or write tasks.
     """
-    def __init__(self, name, start, duration, comment=u''):
+    def __init__(self, name, start=None, duration=None, comment=u''):
         self.name = unicode(name)
-        self.start = start if start else datetime.utcnow()
-        self.duration = float(duration) if duration else 0
+        self.start = start
+        self.duration = float(duration) if duration else None
         self.comment = unicode(comment) if comment else u''
+        self.is_comment = name is None
+
+    def __repr__(self):
+        return u'Task(name=%s, start=%s, duration=%s, comment=%s)'\
+            % (self.name, self.start, self.duration, self.comment)
 
 
 class TaskStream(object):
@@ -73,7 +82,7 @@ class TaskStream(object):
         """Reads a list of tasks from fileobj.
         Line parsing is done by TaskStream.parse().
 
-        fileobj should be created by codecs.open(path, mode, 'utf-8').
+        fileobj should be created by io.open(path, mode, encoding='utf-8').
 
         Raises FormatError on invalid task format.
         """
@@ -86,10 +95,10 @@ class TaskStream(object):
         return tasks
 
     @classmethod
-    def write(cls, tasks, fileobj):
+    def write(cls, fileobj, *tasks):
         """Writes a sequence of tasks to fileobj.
 
-        fileobj should be created by codecs.open(path, mode, 'utf-8').
+        fileobj should be created by io.open(path, mode, encoding='utf-8').
         """
         for task in tasks:
             string = cls.format(task) + u"\n"
@@ -104,7 +113,7 @@ class TaskStream(object):
         """
         line = line.strip()
         if not line or line.startswith('#'):
-            return None
+            return Task(name=None, comment=line)
 
         match = cls.timeless_regex.match(line) or\
             cls.timed_regex.match(line)
@@ -127,8 +136,10 @@ class TaskStream(object):
 
         Returns a unicode string.
 
-        Raises Error if task.name is empty.
+        Raises Error if task.name is empty but not task.is_comment.
         Raises FormatError if start or duration cannot be formatted."""
+        if task.is_comment:
+            return task.comment
         name = task.name.strip()
         start = task.start
         duration = task.duration
@@ -243,9 +254,23 @@ class Path(object):
         Assigns root/{tasks,times,current} to the
         tasks, times, and current attributes.
         """
+        self.root = root
         self.tasks = os.path.join(root, tasks)
         self.times = os.path.join(root, times)
         self.current = os.path.join(root, current)
+
+    def __repr__(self):
+        return u'Path(tasks=%s, times=%s, current=%s, root=%s)'\
+            % (self.tasks, self.times, self.current, self.root)
+
+    @staticmethod
+    def backup(path):
+        """Backs up dir/file to dir/.file~."""
+        parent = os.path.dirname(path)
+        fnam = os.path.basename(path)
+        target_name = u''.join(['.', fnam, '~'])
+        target_path = os.path.join(parent, target_name)
+        shutil.copy2(path, target_path)
 
 
 class Error(Exception):
@@ -257,9 +282,13 @@ class FormatError(Error):
     def __init__(self, message, line=None, lineno=None):
         self.message = message
         self.line = line
-        self.lineno = unicode(lineno)
+        self.lineno = unicode(lineno) if lineno else None
 
     def __str__(self):
+        """Returns FormatError formatted as an error message:
+            lineno: message: line
+        Components of this message will be omitted if not provided.
+        """
         parts = [self.message]
         if self.lineno:
             parts.insert(0, self.lineno)
@@ -267,15 +296,28 @@ class FormatError(Error):
             parts.append(self.line)
         return u": ".join(parts)
 
+    def __repr__(self):
+        return u'FormatError(message=%s, line=%s, lineno=%s)'\
+            % (self.message, self.line, self.lineno)
+
 
 class Punch(object):
     """Carries out the standard punch operations."""
 
     def __init__(self, path=Path()):
-        self.path = path
+        """Creates self.parser and creates path.root."""
         desc = u"The time tracker distinguished by its good taste."
         self.parser = argparse.ArgumentParser(description=desc)
         subparsers = self.parser.add_subparsers()
+
+        self.path = path
+        if not os.path.exists(path.root):
+            try:
+                os.mkdir(path.root)
+            except OSError as e:
+                print >>sys.stderr,\
+                    u"%s: error: cannot create punch directory %s: %s"\
+                    % (self.parser.prog, self.path.root, e)
 
         tasks_parser = subparsers.add_parser('tasks')
         tasks_parsers = tasks_parser.add_subparsers()
@@ -292,7 +334,7 @@ class Punch(object):
 
         tasks_remove_parser = tasks_parsers.add_parser('remove')
         tasks_remove_parser.set_defaults(run=self.tasks_remove)
-        tasks_remove_parser.add_argument('name-glob', nargs='+', type=unicode,
+        tasks_remove_parser.add_argument('nameglob', nargs='+', type=unicode,
             help="the name of the task or tasks to remove")
         tasks_remove_parser.add_argument('--force', '-f', action='store_true',
             help="do not confirm the tasks to be removed")
@@ -302,23 +344,72 @@ class Punch(object):
         args = self.parser.parse_args(args)
         args.run(args)
 
-    def tasks_list(self, args):
-        with codecs.open(self.path.tasks, 'r', 'utf-8') as f:
+    def read_tasks(self, path):
+        """Returns all tasks in path.
+
+        If an error is raised, prints it to stderr and returns None."""
+        with io.open(self.path.tasks, 'r', encoding='utf-8') as f:
             tasks = []
             try:
                 tasks = TaskStream.read(f)
+                return tasks
             except Error as e:
-                print u'%s: %s:%s' % (self.parser.prog, self.path.tasks, e)
-                return
-            for task in tasks:
-                print u'%s / %s' % (task.name, task.comment)
+                print >>sys.stderr, u'%s: error: %s:%s'\
+                    % (self.parser.prog, path, e)
+                return None
+
+    def tasks_list(self, args):
+        tasks = self.read_tasks(self.path.tasks)
+        logged_error = tasks is None
+        if logged_error: return
+        for task in tasks:
+            print '%s' % (TaskStream.format(task))
+        if not tasks:
+            print u'%s: no tasks found -- add some with `%s tasks add`'\
+                % (self.parser.prog, self.parser.prog)
 
     def tasks_add(self, args):
-        pass
+        task = Task(name=args.name, comment=args.comment)
+        desc = TaskStream.format(task)
+        with io.open(self.path.tasks, 'a', encoding='utf-8') as f:
+            TaskStream.write(f, task)
+            print u'%s: added task: %s' % (self.parser.prog, desc)
 
     def tasks_remove(self, args):
-        pass
+        tasks = self.read_tasks(self.path.tasks)
+        if tasks is None:
+            return
 
+        to_remove = []
+        for glob in args.nameglob:
+            to_remove += [t for t in tasks if fnmatch.fnmatch(t.name, glob)]
+        count = len(to_remove)
+        if not count:
+            print u'%s: no task names match %s'\
+                % (self.parser.prog, u' '.join(*args.nameglob))
+            return
+
+        if not args.force:
+            buf = StringIO()
+            header = u'%s: found %d:\n' % (self.parser.prog, count)
+            buf.write(header)
+            for task in to_remove:
+                buf.write('    %s\n' % (TaskStream.format(task)))
+            prompt = u'%s: (r)emove or (N)ot? ' % (self.parser.prog)
+            buf.write(prompt)
+            reply = raw_input(buf.getvalue()).strip()
+            buf.close()
+            if not (reply and reply[0].lower() == 'r'):
+                print u'%s: aborted' % (self.parser.prog)
+                return
+
+        remainder = list(tasks)
+        for task in to_remove:
+            remainder.remove(task)
+        Path.backup(self.path.tasks)
+        with io.open(self.path.tasks, 'w', encoding='utf-8') as f:
+            TaskStream.write(f, *remainder)
+        print u'%s: removed %d' % (self.parser.prog, count)
 
 def main():
     punch = Punch()
