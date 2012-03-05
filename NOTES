@@ -1,12 +1,14 @@
 ## Desired Interface
 name-glob below means a name optionally including '*' for any chars and
-'?' for a single char. '\' is an escape character.
+'?' for a single char. '\' is an escape character. (used fnmatch)
 
     punch tasks list
     punch tasks add/new name and the rest is comments
     punch tasks remove/del/rm -f/--force name-glob name-glob name-glob
 
 `--force` prevents asking for confirmation prior to deletion.
+
+**???: Any way to add command aliases when using argparse?**
 
     punch in name-glob
 list tasks matching, or if just 1, declare it; no task lists all to choose from
@@ -36,6 +38,16 @@ A task is just:
     one-word-name start-time/duration free-form comment till end of line
 
     tps-report 2012-02-25T17:35:45Z/PT12H05M36S man this sucks
+
+Ok, but this GIVES UP the ready parseability of the timestamp format.
+You can't just sum $3 or whatever with awk.
+We can fix this by throwing in comment lines like:
+
+    #^: 2012-02-25 34200 seconds
+
+And then we can once again pull out what we want with:
+
+    cat times | awk '/^#\^:/ { s += $3 } END { print "sum: ", s }'
 
 Last 3 are optional. If you want a default comment, just do
 
