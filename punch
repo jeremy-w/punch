@@ -365,6 +365,63 @@ class FormatError(Error):
             % (self.message, self.line, self.lineno)
 
 
+class Core(object):
+    """Layer over Task, TaskStream, and Path."""
+    def __init__(self, path=Path()):
+        """Creates a new Core object."""
+        self.path = path
+
+    def current_task(self):
+        """Returns the first (and only) task in self.path.current
+        after updating its duration to match the current time.
+
+        Returns None if the file does not exist or is empty.
+        """
+        if not os.path.isfile(self.path.current):
+            return None
+        with io.open(self.path.current, 'r', encoding='utf-8') as f:
+            tasks = TaskStream.read(f)
+            tasks = [t for t in tasks if not t.is_comment]
+            if tasks:
+                task = tasks[0]
+                task.duration = ISO.duration(task.start, datetime.utcnow())
+                return task
+            return None
+
+    def write_task_to_path(self, task, path, backup=True):
+        """Writes |task| over |path|."""
+        if backup: Path.backup(path)
+        with io.open(path, 'w', encoding='utf-8') as f:
+            TaskStream.write(f, task)
+
+    def append_task_to_path(self, task, path):
+        """Appends |task| to |path|."""
+        with io.open(path, 'a', encoding='utf-8') as f:
+            TaskStream.write(f, task)
+
+    def read_tasks(self, path):
+        """Returns all tasks in path.
+
+        If an error is raised, prints it to stderr and returns None."""
+        with io.open(self.path.tasks, 'r', encoding='utf-8') as f:
+            tasks = []
+            try:
+                tasks = TaskStream.read(f)
+                return tasks
+            except Error as e:
+                print >>sys.stderr, u'%s: error: %s:%s'\
+                    % (self.prog, path, e)
+                return None
+
+    @staticmethod
+    def tasks_matching_globs(tasks, globs):
+        """Returns the list of tasks whose names match any of globs."""
+        matches = []
+        for glob in globs:
+            matches += [t for t in tasks if fnmatch.fnmatch(t.name, glob)]
+        return matches
+
+
 class Punch(object):
     """Carries out the standard punch operations."""
 
@@ -372,6 +429,7 @@ class Punch(object):
         """Creates self.parser and creates path.root."""
         desc = u"The time tracker distinguished by its good taste."
         self.parser = argparse.ArgumentParser(description=desc)
+        self.prog = self.parser.prog
         subparsers = self.parser.add_subparsers()
 
         self.path = path
@@ -381,7 +439,9 @@ class Punch(object):
             except OSError as e:
                 print >>sys.stderr,\
                     u"%s: error: cannot create punch directory %s: %s"\
-                    % (self.parser.prog, self.path.root, e)
+                    % (self.prog, self.path.root, e)
+
+        self.core = Core(path)
 
         self.add_tasks_parser(subparsers)
         self.add_times_parser(subparsers)
@@ -430,19 +490,19 @@ class Punch(object):
         """Reduces args to a single task and calls punch_in(task)
         after punching out any existing current task.
         """
-        tasks = self.read_tasks(self.path.tasks)
+        tasks = self.core.read_tasks(self.path.tasks)
         logged_error = tasks is None
         if logged_error: return
         if not tasks:
             print u'%s: no tasks found -- add some with `%s tasks add`'\
-                % (self.parser.prog, self.parser.prog)
+                % (self.prog, self.prog)
             return
 
-        matches = self.tasks_matching_globs(tasks, [args.nameglob])\
+        matches = self.core.tasks_matching_globs(tasks, [args.nameglob])\
             if args.nameglob else tasks
         if not matches:
             print u'%s: no task names match %s'\
-                % (self.parser.prog, args.nameglob)
+                % (self.prog, args.nameglob)
             return
         count = len(matches)
 
@@ -451,45 +511,45 @@ class Punch(object):
         for i, task in enumerate(matches):
             buf.write(template % (i + 1, task))
         buf.write(u'%s: enter a number to select a task: '\
-            % (self.parser.prog))
+            % (self.prog))
         val = raw_input(buf.getvalue())
         buf.close()
 
         # validate val to get index
         if not val:
-            print u'%s: aborted' % (self.parser.prog)
+            print u'%s: aborted' % (self.prog)
             return
         index = 0
         try:
             index = int(val) - 1
         except ValueError:
-            print u'%s: error: not a number: %s' % (self.parser.prog, val)
+            print u'%s: error: not a number: %s' % (self.prog, val)
             return
         if not 0 <= index < count:
             print u'%s: error: must select 1-%d, not %d'\
-                % (self.parser.prog, count, index + 1)
+                % (self.prog, count, index + 1)
 
         task = matches[index]
-        current = self.current_task()
+        current = self.core.current_task()
         if current:
             if task.name == current.name:
                 print u'%s: already punched in: %s'\
-                    % (self.parser.prog, current)
+                    % (self.prog, current)
                 return
             self.punch_out()
 
         task.start = datetime.utcnow().replace(microsecond=0)
-        self.write_task_to_path(task, self.path.current)
+        self.core.write_task_to_path(task, self.path.current)
         print u'%s: punched in: %s'\
-            % (self.parser.prog, task)
+            % (self.prog, task)
 
     def punch_out(self, args):
         """Appends the task from self.path.current to self.path.times
         and then removes self.path.current.
         """
-        task = self.current_task()
+        task = self.core.current_task()
         if not task:
-            print u'%s: no current task to punch out' % (self.parser.prog)
+            print u'%s: no current task to punch out' % (self.prog)
             return
 
         # We follow the task with a comment containing
@@ -510,35 +570,7 @@ class Punch(object):
         # Already copied sole entry to self.path.times,
         # so no need to make another backup before unlinking.
         os.unlink(self.path.current)
-        print u'%s: punched out: %s' % (self.parser.prog, task)
-
-    def current_task(self):
-        """Returns the first (and only) task in self.path.current
-        after updating its duration to match the current time.
-
-        Returns None if the file does not exist or is empty.
-        """
-        if not os.path.isfile(self.path.current):
-            return None
-        with io.open(self.path.current, 'r', encoding='utf-8') as f:
-            tasks = TaskStream.read(f)
-            tasks = [t for t in tasks if not t.is_comment]
-            if tasks:
-                task = tasks[0]
-                task.duration = ISO.duration(task.start, datetime.utcnow())
-                return task
-            return None
-
-    def write_task_to_path(self, task, path, backup=True):
-        """Writes |task| over |path|."""
-        if backup: Path.backup(path)
-        with io.open(path, 'w', encoding='utf-8') as f:
-            TaskStream.write(f, task)
-
-    def append_task_to_path(self, task, path):
-        """Appends |task| to |path|."""
-        with io.open(path, 'a', encoding='utf-8') as f:
-            TaskStream.write(f, task)
+        print u'%s: punched out: %s' % (self.prog, task)
 
     def handle(self, args):
         """Handles args as if provided on the commandline."""
@@ -552,74 +584,52 @@ class Punch(object):
         """Lists the current task.
 
         This is the default behavior when invoked with no args."""
-        task = self.current_task()
+        task = self.core.current_task()
         if task:
-            print u'%s: current task: %s' % (self.parser.prog, task)
+            print u'%s: current task: %s' % (self.prog, task)
         else:
-            print u'%s: no current task' % (self.parser.prog)
-
-    def read_tasks(self, path):
-        """Returns all tasks in path.
-
-        If an error is raised, prints it to stderr and returns None."""
-        with io.open(self.path.tasks, 'r', encoding='utf-8') as f:
-            tasks = []
-            try:
-                tasks = TaskStream.read(f)
-                return tasks
-            except Error as e:
-                print >>sys.stderr, u'%s: error: %s:%s'\
-                    % (self.parser.prog, path, e)
-                return None
-
-    @staticmethod
-    def tasks_matching_globs(tasks, globs):
-        """Returns the list of tasks whose names match any of globs."""
-        matches = []
-        for glob in globs:
-            matches += [t for t in tasks if fnmatch.fnmatch(t.name, glob)]
-        return matches
+            print u'%s: no current task' % (self.prog)
 
     def tasks_list(self, args):
-        tasks = self.read_tasks(self.path.tasks)
+        tasks = self.core.read_tasks(self.path.tasks)
         logged_error = tasks is None
         if logged_error: return
         if not tasks:
             print u'%s: no tasks found -- add some with `%s tasks add`'\
-                % (self.parser.prog, self.parser.prog)
+                % (self.prog, self.prog)
         for task in tasks:
             print str(task)
 
     def tasks_add(self, args):
         task = Task(name=args.name, comment=args.comment)
         desc = TaskStream.format(task)
-        self.append_task_to_path(task, self.path.tasks)
-        print u'%s: added task: %s' % (self.parser.prog, desc)
+        self.core.append_task_to_path(task, self.path.tasks)
+        print u'%s: added task: %s' % (self.prog, desc)
 
     def tasks_remove(self, args):
-        tasks = self.read_tasks(self.path.tasks)
+        tasks = self.core.read_tasks(self.path.tasks)
         if tasks is None:
             return
 
-        to_remove = self.tasks_matching_globs(tasks, args.nameglob)
+        to_remove = self.core.tasks_matching_globs(tasks, args.nameglob)
         count = len(to_remove)
         if not count:
             print u'%s: no task names match %s'\
-                % (self.parser.prog, u' '.join(*args.nameglob))
+                % (self.prog, u' '.join(*args.nameglob))
             return
 
         if not args.force:
             buf = StringIO()
-            header = u'%s: found %d:\n' % (self.parser.prog, count)
+            header = u'%s: found %d:\n' % (self.prog, count)
             buf.write(header)
             for task in to_remove:
                 buf.write('    %s\n' % (TaskStream.format(task)))
-            prompt = u'%s: (r)emove or (N)ot? ' % (self.parser.prog)
+            prompt = u'%s: (r)emove or (N)ot? ' % (self.prog)
             buf.write(prompt)
             reply = raw_input(buf.getvalue()).strip()
             buf.close()
             if not (reply and reply[0].lower() == 'r'):
-                print u'%s: aborted' % (self.parser.prog)
+                print u'%s: aborted' % (self.prog)
                 return
 
         remainder = list(tasks)
@@ -628,7 +638,7 @@ class Punch(object):
         Path.backup(self.path.tasks)
         with io.open(self.path.tasks, 'w', encoding='utf-8') as f:
             TaskStream.write(f, *remainder)
-        print u'%s: removed %d' % (self.parser.prog, count)
+        print u'%s: removed %d' % (self.prog, count)
 
 
 def main():
