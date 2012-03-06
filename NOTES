@@ -8,14 +8,22 @@ name-glob below means a name optionally including '*' for any chars and
 
 `--force` prevents asking for confirmation prior to deletion.
 
-**???: Any way to add command aliases when using argparse?**
+**???: Any way to add command aliases when using argparse? Not until a later
+Python -- see [aliases for positional arguments (subparsers)][aliases].
+
+  [aliases]: http://bugs.python.org/issue9234
+
+Or set a default subcommand when none is provided?
+Yes, scan the args yourself and stick in the default. Yuck. **
 
     punch in name-glob
 list tasks matching, or if just 1, declare it; no task lists all to choose from
 
     punch out comment
 
-    punch times (dumps path as comment followed by contents)
+    punch times
+
+What should punch times do, anyway?
 
 Invoke as `punch times file` or `punch times -` to dump from that source
 and validate its format.
@@ -39,21 +47,17 @@ A task is just:
 
     tps-report 2012-02-25T17:35:45Z/PT12H05M36S man this sucks
 
-Ok, but this GIVES UP the ready parseability of the timestamp format.
-You can't just sum $3 or whatever with awk.
-We can fix this by throwing in comment lines like:
-
-    #^: 2012-02-25 34200 seconds
-
-And then we can once again pull out what we want with:
-
-    cat times | awk '/^#\^:/ { s += $3 } END { print "sum: ", s }'
-
 Last 3 are optional. If you want a default comment, just do
 
     name / whatever your comment is
 
 in tasks.
+
+We add finished tasks to the /times file followed by a comment summarizing
+some information about the entry. This makes it easier to skim the file
+and to generate summaries using external tools (as opposed to loading up
+punch as a Python library and going from there, which you should feel
+free to do).
 
 ## New Arch
 * Task -- name, start, duration, comment

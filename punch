@@ -472,9 +472,22 @@ class Punch(object):
         if not task:
             print u'%s: no current task to punch out' % (self.parser.prog)
             return
-        stop = datetime.utcnow()
-        task.duration = ISO.duration(task.start, stop)
-        self.append_task_to_path(task, self.path.times)
+
+        # We follow the task with a comment containing
+        # the local date, hours (rounded to the half-hour), and total seconds.
+        # This makes building a summary with an external tool easier.
+        comment = u'#^ local %s : %0.3f h = %d s'
+        local_stop = datetime.now()
+        local_start = ISO.duration(stop=local_stop, duration=task.duration)
+        local_date = local_start.date().isoformat()
+        secs = round(task.duration)
+        hours = float(secs) / 3600.0
+        comment = comment % (local_date, hours, secs)
+        comment_task = Task.comment(comment)
+
+        with io.open(self.path.times, 'a', encoding='utf-8') as f:
+            TaskStream.write(f, task, comment_task)
+
         # Already copied sole entry to self.path.times,
         # so no need to make another backup before unlinking.
         os.unlink(self.path.current)
