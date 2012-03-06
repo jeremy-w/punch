@@ -62,9 +62,6 @@ time zone, not in UTC.
 * Punch -- the tool, as an object
 
 ## TODO
-* Switch to a cleaner contextual presentation of tasks in response to
-  user actions. punch in, out, current, etc. don't need a ton of info.
-  This might be a sensible use of Task.__str__().
 * Switch to local time, add offset from UTC to date format.
 * Temporarily include just the hh:mm:ss in summary
 * Flesh out punch times to display just a range of results

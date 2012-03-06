@@ -55,6 +55,25 @@ class Task(object):
         """Creates a new comment task - a task that is purely a comment."""
         return cls(name=None, comment=comment)
 
+    def __str__(self):
+        """Returns a string with the elapsed time, name, and comment.
+
+        Used when presenting a task to the user in response to an interactive
+        command.
+        """
+        if self.is_comment:
+            return self.comment
+        s = self.duration
+        m, s = divmod(s, 60)
+        h, m = divmod(m, 60)
+        s = round(s)
+        time = u'- '
+        if h > 0:
+            time = u'%dh%02dm%02ds ' % (h, m, s)
+        elif m > 0 or s > 0:
+            time = u'%dm%02ds ' % (m, s)
+        return u'%s%s (%s)' % (time, self.name, self.comment)
+
     def __repr__(self):
         return u'Task(name=%s, start=%s, duration=%s, comment=%s)'\
             % (self.name, self.start, self.duration, self.comment)
@@ -430,7 +449,7 @@ class Punch(object):
         buf = StringIO()
         template = u'%%%dd: %%s\n' % (math.log(count, 10))
         for i, task in enumerate(matches):
-            buf.write(template % (i + 1, TaskStream.format(task)))
+            buf.write(template % (i + 1, task))
         buf.write(u'%s: enter a number to select a task: '\
             % (self.parser.prog))
         val = raw_input(buf.getvalue())
@@ -455,14 +474,14 @@ class Punch(object):
         if current:
             if task.name == current.name:
                 print u'%s: already punched in: %s'\
-                    % (self.parser.prog, TaskStream.format(current))
+                    % (self.parser.prog, current)
                 return
             self.punch_out()
 
         task.start = datetime.utcnow().replace(microsecond=0)
         self.write_task_to_path(task, self.path.current)
         print u'%s: punched in: %s'\
-            % (self.parser.prog, TaskStream.format(task))
+            % (self.parser.prog, task)
 
     def punch_out(self, args):
         """Appends the task from self.path.current to self.path.times
@@ -491,8 +510,7 @@ class Punch(object):
         # Already copied sole entry to self.path.times,
         # so no need to make another backup before unlinking.
         os.unlink(self.path.current)
-        print u'%s: punched out: %s'\
-            % (self.parser.prog, TaskStream.format(task))
+        print u'%s: punched out: %s' % (self.parser.prog, task)
 
     def current_task(self):
         """Returns the first (and only) task in self.path.current
@@ -536,20 +554,7 @@ class Punch(object):
         This is the default behavior when invoked with no args."""
         task = self.current_task()
         if task:
-            template = u'%s: current task: %s %s %s'
-            # Do our own task formatting, since context supplies date.
-            s = task.duration
-            m, s = divmod(s, 60)
-            h, m = divmod(m, 60)
-            s = round(s)
-            time = None
-            if h > 0:
-                time = u'%d:%02d:%02d' % (h, m, s)
-            elif m > 0:
-                time = u'%d:%02d' % (m, s)
-            else:
-                time = u'%d' % (s)
-            print template % (self.parser.prog, time, task.name, task.comment)
+            print u'%s: current task: %s' % (self.parser.prog, task)
         else:
             print u'%s: no current task' % (self.parser.prog)
 
@@ -583,7 +588,7 @@ class Punch(object):
             print u'%s: no tasks found -- add some with `%s tasks add`'\
                 % (self.parser.prog, self.parser.prog)
         for task in tasks:
-            print '%s' % (TaskStream.format(task))
+            print str(task)
 
     def tasks_add(self, args):
         task = Task(name=args.name, comment=args.comment)
