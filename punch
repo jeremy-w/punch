@@ -50,6 +50,11 @@ class Task(object):
         self.comment = unicode(comment) if comment else u''
         self.is_comment = name is None
 
+    @classmethod
+    def comment(cls, comment):
+        """Creates a new comment task - a task that is purely a comment."""
+        return cls(name=None, comment=comment)
+
     def __repr__(self):
         return u'Task(name=%s, start=%s, duration=%s, comment=%s)'\
             % (self.name, self.start, self.duration, self.comment)
@@ -114,7 +119,7 @@ class TaskStream(object):
         """
         line = line.strip()
         if not line or line.startswith('#'):
-            return Task(name=None, comment=line)
+            return Task.comment(comment=line)
 
         match = cls.timeless_regex.match(line) or\
             cls.timed_regex.match(line)
