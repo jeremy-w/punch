@@ -1,3 +1,4 @@
+<!-- vi: set et ts=4 sw=4 -->
 ## Desired Interface
 name-glob below means a name optionally including '*' for any chars and
 '?' for a single char. '\' is an escape character. (used fnmatch)
@@ -23,41 +24,24 @@ list tasks matching, or if just 1, declare it; no task lists all to choose from
 
     punch times
 
-What should punch times do, anyway?
+What should punch times do, anyway? How about easy summary/selective listing?
 
-Invoke as `punch times file` or `punch times -` to dump from that source
-and validate its format.
+    punch times --after DATE --before DATE --on DATE
+    punch times --template 'name: {name}'
 
-## DRY Up Code
-Unify file access around the notion of de/serializing Tasks.
+Template tokens:
 
-    Task.parse(), Task.format()
+    {name}
+    {comment}
+    {hours|0.5}
+    {seconds}
+    {start|utcdate}
+    {start|date}
 
-The parser knows to skip blank lines and comment lines:
-    parser = FileParser(path)
-    parser.readTasks()
-    parser.writeTasks(tasks, fileobj)
-
-Write out entire task in all files. No need for a comprehensive task database.
-This should be a SIMPLE tool, not your average billing department mess.
-
-A task is just:
-
-    one-word-name start-time/duration free-form comment till end of line
-
-    tps-report 2012-02-25T17:35:45Z/PT12H05M36S man this sucks
-
-Last 3 are optional. If you want a default comment, just do
-
-    name / whatever your comment is
-
-in tasks.
-
-We add finished tasks to the /times file followed by a comment summarizing
-some information about the entry. This makes it easier to skim the file
-and to generate summaries using external tools (as opposed to loading up
-punch as a Python library and going from there, which you should feel
-free to do).
+This highlights that we cannot recover local time info from UTC, but we can
+recover UTC from local time info + offset. We will move to that instead.
+It's also more convenient, since the user (naturally) works in their local
+time zone, not in UTC.
 
 ## New Arch
 * Task -- name, start, duration, comment
@@ -66,7 +50,7 @@ free to do).
 
 * TaskStream -- skips comment and blank lines
     - read(fileobj)
-    - write(taskseq)
+    - write(fileobj, taskseq)
 
 * ISO -- handles ISO formatting, UTC->local conversions for summary
     - now() -- current date-time in UTC
@@ -74,7 +58,14 @@ free to do).
     - local(datetime) -- converts to local time
 
 * Path -- global again -- config but named better
-* Switch back to procedural code for the commands:
-    - punch_in(glob), punch_out(), punch_now(), punch_times free functions
-    - parse ourselves rather than messing with argparse(), since we don't have
-      any switches
+
+* Punch -- the tool, as an object
+
+## TODO
+* Switch to a cleaner contextual presentation of tasks in response to
+  user actions. punch in, out, current, etc. don't need a ton of info.
+  This might be a sensible use of Task.__str__().
+* Switch to local time, add offset from UTC to date format.
+* Temporarily include just the hh:mm:ss in summary
+* Flesh out punch times to display just a range of results
+* Add templating to punch times
