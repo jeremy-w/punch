@@ -448,7 +448,6 @@ class Punch(object):
         task = matches[index]
         current = self.current_task()
         if current:
-            current.duration = ISO.duration(current.start, datetime.utcnow())
             if task.name == current.name:
                 print u'%s: already punched in: %s'\
                     % (self.parser.prog, TaskStream.format(current))
@@ -478,7 +477,8 @@ class Punch(object):
             % (self.parser.prog, TaskStream.format(task))
 
     def current_task(self):
-        """Returns the first (and only) task in self.path.current.
+        """Returns the first (and only) task in self.path.current
+        after updating its duration to match the current time.
 
         Returns None if the file does not exist or is empty.
         """
@@ -486,7 +486,11 @@ class Punch(object):
             return None
         with io.open(self.path.current, 'r', encoding='utf-8') as f:
             tasks = TaskStream.read(f)
-            if tasks: return tasks[0]
+            tasks = [t for t in tasks if not t.is_comment]
+            if tasks:
+                task = tasks[0]
+                task.duration = ISO.duration(task.start, datetime.utcnow())
+                return task
             return None
 
     def write_task_to_path(self, task, path, backup=True):
