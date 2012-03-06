@@ -21,7 +21,7 @@ Punch's file format:
 - Unicode-friendly thanks to UTF-8
 """
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 import fnmatch
 import io
 import math
@@ -255,10 +255,10 @@ class ISO(object):
             raise Error(u"ISO.duration: expected exactly 2 args, %d supplied"\
                 % count)
         if not start:
-            start = stop + datetime.timedelta(seconds=-duration)
+            start = stop + timedelta(seconds=-duration)
             return start
         if not stop:
-            stop = start + datetime.timedelta(seconds=duration)
+            stop = start + timedelta(seconds=duration)
             return stop
         if not duration:
             delta = stop - start
