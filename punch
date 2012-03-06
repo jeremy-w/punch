@@ -17,7 +17,6 @@ Punch's file format:
 
 - human-readable, -editable, and -comprehensible
 - easily computer-readable, -editable, and -comprehensible
-- uses ISO 8601 formatting and UTC throughout
 - Unicode-friendly thanks to UTF-8
 """
 import argparse
@@ -34,18 +33,20 @@ import sys
 
 class Task(object):
     """A task represents a space-free name,
-    a start time and duration, and an optional free-form comment.
+    a start time, UTC offset, and duration, and an optional free-form comment.
 
-    The start time is stored as a datetime.
-    Duration is in seconds.
+    Start is a local datetime.
+    Tz is a float with the skew from UTC in seconds.
+    Duration is a float counting seconds.
     Comment is optional and defaults to the empty unicode string.
 
     Use ISO to format this info.
     Use TaskStream to read or write tasks.
     """
-    def __init__(self, name, start=None, duration=None, comment=u''):
+    def __init__(self, name, start=None, duration=None, comment=u'', tz=None):
         self.name = unicode(name)
         self.start = start
+        self.tz = tz
         self.duration = float(duration) if duration else None
         self.comment = unicode(comment) if comment else u''
         self.is_comment = name is None
@@ -63,7 +64,7 @@ class Task(object):
         """
         if self.is_comment:
             return self.comment
-        s = self.duration
+        s = self.duration or 0.0
         m, s = divmod(s, 60)
         h, m = divmod(m, 60)
         s = round(s)
@@ -75,8 +76,8 @@ class Task(object):
         return u'%s%s (%s)' % (time, self.name, self.comment)
 
     def __repr__(self):
-        return u'Task(name=%s, start=%s, duration=%s, comment=%s)'\
-            % (self.name, self.start, self.duration, self.comment)
+        return u'Task(name=%s, start=%s, duration=%s, comment=%s, tz=%f)'\
+            % (self.name, self.start, self.duration, self.comment, self.tz)
 
 
 class TaskStream(object):
@@ -148,11 +149,12 @@ class TaskStream(object):
         group = match.groupdict()
         name = group.get('name')
         start = group.get('start')
-        if start: start = ISO.to_datetime(start)
+        tz = None
+        if start: start, tz = ISO.to_datetime(start)
         duration = group.get('duration')
         if duration: duration = ISO.duration_to_seconds(duration)
         comment = group.get('comment') or u''
-        task = Task(name, start, duration, comment)
+        task = Task(name, start, duration, comment, tz)
         return task
 
     @classmethod
@@ -173,7 +175,8 @@ class TaskStream(object):
         if not name:
             raise Error("a task must have a name")
         if start:
-            start = ISO.from_datetime(start)
+            tz = task.tz or 0.0
+            start = ISO.from_datetime(start, tz)
             if not duration: duration = 0
         if duration is not None:
             duration = ISO.seconds_to_duration(duration)
@@ -196,17 +199,33 @@ class ISO(object):
 
     isodatetime_regex = re.compile(
         r"""(?P<year> \d{4} ) - (?P<month> \d{2} ) - (?P<day> \d{2} )
-        T (?P<hour> \d{2} ) : (?P<minute> \d{2} ) : (?P<second> \d{2} ) Z?""",
+        T (?P<hour> \d{2} ) : (?P<minute> \d{2} ) : (?P<second> \d{2} )
+        (?: Z | (?P<sign> \+|- ) (?P<dh> \d{2} ) : (?P<dm> \d{2} ) )""",
         re.U | re.X)
     isoduration_regex = re.compile(
         r"""P (?:(?P<Y> \d* )Y)? (?:(?P<M> \d+ )M)? (?:(?P<D> \d+ )D)?
         (?:T (?:(?P<TH> \d+ )H)? (?:(?P<TM> \d+ )M)? (?:(?P<TS> \d+ )S)?)?""",
         re.U | re.X)
-    isodatetime_format = u"%04d-%02d-%02dT%02d:%02d:%02dZ"
+    isodatetime_format = u"%04d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d"
+
+    @classmethod
+    def seconds_from_utc(cls):
+        """Returns a float with the seconds local time is offset from UTC.
+
+        Local time + offset = UTC time, so a time zone relative to UTC
+        would have the opposite sign of offset.
+        """
+        now = time.time()
+        local = datetime.fromtimestamp(now)
+        utc = datetime.utcfromtimestamp(now)
+        delta = utc - local
+        seconds = float(round(delta.seconds + 86400 * delta.days))
+        return seconds
 
     @classmethod
     def to_datetime(cls, isostring):
-        """Returns the datetime corresponding to an ISO-8601 date-time string.
+        """Returns the datetime and UTC offset in seconds
+        corresponding to an ISO-8601 date-time string.
 
         Raises FormatError if the string format is bad."""
         match = cls.isodatetime_regex.match(isostring)
@@ -217,14 +236,29 @@ class ISO(object):
         vals = [group['year'], group['month'], group['day'],
             group['hour'], group['minute'], group['second']]
         vals = [int(val) for val in vals]
+
+        offset = 0.0
+        sign = group['sign']
+        if sign:
+            h = float(group['dh'])
+            m = float(group['dm'])
+            offset = 60.0 * (m + 60.0 * h)
+            if sign == '+':
+                offset = -offset
+
         dt = datetime(*vals)
-        return dt
+        return dt, offset
 
     @classmethod
-    def from_datetime(cls, datetime):
+    def from_datetime(cls, datetime, tz):
         """Returns an ISO-8601-formatted string corresponding to datetime."""
+        # tz is expressed relative to local time, but +/- sign is relative to
+        # UTC, so we use the opposite sign you'd expect here
+        sign = tz > 0 and '-' or '+'
+        m, s = divmod(tz, 60)
+        h, m = divmod(m, 60)
         parts = (datetime.year, datetime.month, datetime.day,
-            datetime.hour, datetime.minute, datetime.second)
+            datetime.hour, datetime.minute, datetime.second, sign, h, m)
         string = cls.isodatetime_format % parts
         return string
 
