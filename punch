@@ -524,8 +524,34 @@ class Punch(object):
 
     def handle(self, args):
         """Handles args as if provided on the commandline."""
+        if not args:
+            self.list_current()
+            return
         args = self.parser.parse_args(args)
         args.run(args)
+
+    def list_current(self):
+        """Lists the current task.
+
+        This is the default behavior when invoked with no args."""
+        task = self.current_task()
+        if task:
+            template = u'%s: current task: %s %s %s'
+            # Do our own task formatting, since context supplies date.
+            s = task.duration
+            m, s = divmod(s, 60)
+            h, m = divmod(m, 60)
+            s = round(s)
+            time = None
+            if h > 0:
+                time = u'%d:%02d:%02d' % (h, m, s)
+            elif m > 0:
+                time = u'%d:%02d' % (m, s)
+            else:
+                time = u'%d' % (s)
+            print template % (self.parser.prog, time, task.name, task.comment)
+        else:
+            print u'%s: no current task' % (self.parser.prog)
 
     def read_tasks(self, path):
         """Returns all tasks in path.
