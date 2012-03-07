@@ -326,6 +326,15 @@ class ISO(object):
                 duration += 1
             return duration
 
+    @classmethod
+    def datetime_to_utc(cls, datetime, from_utc):
+        """Converts datetime to a UTC datetime by adding the number of seconds
+        in from_utc to it.
+        """
+        delta = timedelta(seconds=from_utc)
+        utcdatetime = datetime + delta
+        return utcdatetime
+
 
 class Path(object):
     """Path is a place to stuff all the paths used by punch."""
@@ -419,7 +428,8 @@ class Core(object):
             tasks = [t for t in tasks if not t.is_comment]
             if tasks:
                 task = tasks[0]
-                task.duration = ISO.duration(task.start, datetime.now())
+                utcstart = ISO.datetime_to_utc(task.start, task.tz)
+                task.duration = ISO.duration(utcstart, datetime.utcnow())
                 return task
             return None
 

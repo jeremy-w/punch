@@ -62,7 +62,6 @@ time zone, not in UTC.
 * Punch -- the tool, as an object
 
 ## TODO
-* Duration computation should convert to UTC.
 * Flesh out punch times to display just a range of results
 * Add nameglob to `tasks list`, default `*`.
 * Add --comment commentglob to `tasks list`.
