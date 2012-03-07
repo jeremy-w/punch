@@ -31,12 +31,36 @@ What should punch times do, anyway? How about easy summary/selective listing?
 
 Template tokens:
 
-    {name}
-    {comment}
-    {hours|0.5}
-    {seconds}
-    {start|utcdate}
-    {start|date}
+    {name}, {n}
+    {comment}, {c}
+    {duration}, {d} -- duration in seconds
+    {start}, {s} -- start date-time
+    {end}, {e} -- end date-time
+
+Syntax:
+
+    {token|filter/modifier}
+
+Filters for duration (mutually exclusive):
+
+    clock, c -- display as hh:mm:ss
+    hours, h -- display as hours 9.999
+    minutes, m -- display as minutes 9.999
+
+Modifier for duration:
+
+    5[udb]? -- rounding and precision control
+
+      number specifies the max number of digits after the decimal point
+      udb are rounding modes - up, down, banker's
+
+      affects only the seconds field with the clock filter
+
+Filters for start/end:
+
+    date -- just date
+    time -- just time
+    utc -- convert to UTC before displaying date/time
 
 This highlights that we cannot recover local time info from UTC, but we can
 recover UTC from local time info + offset. We will move to that instead.
