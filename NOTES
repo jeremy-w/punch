@@ -38,6 +38,12 @@ Template tokens:
     {end}, {e} -- end date-time -- approximate, assumes no time zone shift
         throughout duration
 
+The approximate end time problem suggests we drop the start/duration format
+and shift to a start/end format, since we can embed time info in *both* of
+those. That does mean we will need to plumb another tzoffset into Task and
+change out our formatting. It might be time to move to (dt, tz) pairs rather
+than keeping them entirely separate.
+
 Syntax:
 
     {token|filter/modifier}
