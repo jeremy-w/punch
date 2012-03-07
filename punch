@@ -29,6 +29,7 @@ import re
 from StringIO import StringIO
 import shutil
 import sys
+import time
 
 
 class Task(object):
@@ -418,7 +419,7 @@ class Core(object):
             tasks = [t for t in tasks if not t.is_comment]
             if tasks:
                 task = tasks[0]
-                task.duration = ISO.duration(task.start, datetime.utcnow())
+                task.duration = ISO.duration(task.start, datetime.now())
                 return task
             return None
 
@@ -572,7 +573,8 @@ class Punch(object):
                 return
             self.punch_out()
 
-        task.start = datetime.utcnow().replace(microsecond=0)
+        task.start = datetime.now().replace(microsecond=0)
+        task.tz = ISO.seconds_from_utc()
         self.core.write_task_to_path(task, self.path.current)
         print u'%s: punched in: %s'\
             % (self.prog, task)
@@ -589,13 +591,10 @@ class Punch(object):
         # We follow the task with a comment containing
         # the local date, hours (rounded to the half-hour), and total seconds.
         # This makes building a summary with an external tool easier.
-        comment = u'#^ local %s : %0.3f h = %d s'
-        local_stop = datetime.now()
-        local_start = ISO.duration(stop=local_stop, duration=task.duration)
-        local_date = local_start.date().isoformat()
+        comment = u'#^ %0.2f h = %d s'
         secs = round(task.duration)
         hours = float(secs) / 3600.0
-        comment = comment % (local_date, hours, secs)
+        comment = comment % (hours, secs)
         comment_task = Task.comment(comment)
 
         with io.open(self.path.times, 'a', encoding='utf-8') as f:
