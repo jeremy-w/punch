@@ -682,7 +682,10 @@ class Punch(object):
             print unicode(task)
 
     def tasks_add(self, args):
-        task = Task(name=args.name, comment=args.comment)
+        comment = u''
+        if args.comment:
+            comment = u' '.join(args.comment)
+        task = Task(name=args.name, comment=comment)
         desc = TaskStream.format(task)
         self.core.append_task_to_path(task, self.path.tasks)
         print u'%s: added task: %s' % (self.prog, desc)
