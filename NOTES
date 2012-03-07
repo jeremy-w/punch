@@ -33,9 +33,10 @@ Template tokens:
 
     {name}, {n}
     {comment}, {c}
-    {duration}, {d} -- duration in seconds
+    {duration}, {d} -- duration in ISO format (PThhHmmMssS)
     {start}, {s} -- start date-time
-    {end}, {e} -- end date-time
+    {end}, {e} -- end date-time -- approximate, assumes no time zone shift
+        throughout duration
 
 Syntax:
 
@@ -46,6 +47,9 @@ Filters for duration (mutually exclusive):
     clock, c -- display as hh:mm:ss
     hours, h -- display as hours 9.999
     minutes, m -- display as minutes 9.999
+    seconds, s -- display as seconds 999
+    lower, l -- display as ptHHhMMmSSs -- like in file, but lowercase
+        (which I find easier to read, since the number stick out more)
 
 Modifier for duration:
 
@@ -86,10 +90,12 @@ time zone, not in UTC.
 * Punch -- the tool, as an object
 
 ## TODO
-* Flesh out punch times to display just a range of results
-* Add nameglob to `tasks list`, default `*`.
-* Add --comment commentglob to `tasks list`.
-* Add --comment commentglob to `tasks remove`.
-    - If both name and commentglob are provided, AND the two lists.
-* Add templating to punch times
+* Add date -> range parser for punch times.
+* Add templated task formatter.
+* punch times:
+    - before/after/on support using daterange parser
+    - template support using TaskTemplate
 * Drop the comment summary from times -- obsoleted by `punch times`.
+* Document templates.
+* Add --comment commentglob to tasks list, tasks remove, times.
+    - If both name and commentglob are provided, AND the two lists.

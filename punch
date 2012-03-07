@@ -546,7 +546,21 @@ class Punch(object):
         """Adds the parser tree responsible for handling
         `punch times` to |subparsers|.
         """
-        print "TODO: add_times_parser"
+        times_parser = subparsers.add_parser('times',
+            help='configurable display of recorded times')
+        times_parser.set_defaults(run=self.punch_times)
+        times_parser.add_argument('--after', '-a', type=unicode,
+            metavar='DATETIME', help="list entries during or after DATETIME")
+        times_parser.add_argument('--before', '-b', type=unicode,
+            metavar='DATETIME', help="list entries during or before DATETIME")
+        times_parser.add_argument('--on', '-o', type=unicode,
+            metavar='DATETIME', help="list entries during DATETIME")
+        times_parser.add_argument('--template', '-t', type=unicode,
+            metavar='TEMPLATE', help="format entries using TEMPLATE",
+            default=' {name} ({comment})')
+        times_parser.add_argument('nameglob', type=unicode,
+            metavar='NAMEGLOB', help="list entries with matching names",
+            default='*')
 
     def punch_in_glob(self, args):
         """Reduces args to a single task and calls punch_in(task)
@@ -707,6 +721,15 @@ class Punch(object):
             TaskStream.write(f, *remainder)
         print u'%s: removed %d' % (self.prog, count)
 
+    def punch_times(self, args):
+        """Lists time entries from self.path.times.
+
+        The entries can be filtered by date using commandline options.
+        The format used to print listed entries can be set using
+        the --template option.
+        """
+        pass
+
 
 class Help(object):
     def __init__(self, path, prog):
@@ -739,34 +762,195 @@ class Help(object):
             print self.topic_topics()
 
     def topic_topics(self):
-        """Returns a help string listing available topics."""
+        """you're reading it now"""
         header = u"%s: available help topics:\n\n" % (self.prog)
         footer = u"\nNew to %s? Check out walkthrough, concepts, and files."
         footer = footer % (self.prog)
         buf = StringIO()
         buf.write(header)
         for topic in self.topics:
-            buf.write(u'  %s\n' % topic)
+            m = getattr(self, 'topic_' + topic)
+            desc = m.__doc__
+            buf.write(u'  %s -- %s\n' % (topic, desc))
         buf.write(footer)
         msg = buf.getvalue()
         buf.close()
         return msg
 
     def topic_walkthrough(self):
-        """Returns a help string."""
-        pass
+        """basic setup and use"""
+        h = """Welcome to %s!
 
-    def topic_concepts(self):
-        """Returns a help string."""
-        pass
+%S tracks and summarizes the time you spend on tasks. It's a combination
+punch-clock and timesheet.
+
+A task has a one-word name and a one-line comment. Create a couple now with:
+
+    %s tasks add name the rest is a comment
+    %s tasks add %s-walkthrough how I learned to use %s
+    %s tasks add cocktail-hour man was that a blast
+
+Let's make sure they're there:
+
+    %s tasks list
+
+Hmm, maybe we don't want to clock our drinking time. Let's remove that
+task:
+
+    %s tasks remove cockt*
+
+See that `cockt*`? Several %s commands accept "globs", which make it
+easy to specify tasks without having to type too much. They also let you
+create your own simple task hierarchy using unique prefixes. Read more
+at `%s help globs`.
+
+Confirm the removal by typing 'r', and list again:
+
+    %s tasks list
+
+There, that's more like it.
+
+Now, punch in:
+
+    %s in
+
+Enter a number to choose a task. You can also provide a glob to shorten
+the list. If the glob only leaves one task, you get to skip the list.
+
+Check what you're punched in on by calling %s with no arguments:
+
+    %s
+
+Now punch out with:
+
+    %s out
+
+You'll see a summary of how long you were clocked in.
+
+You can view your time entries like so:
+
+    %s times
+
+There! Now you know how to use %s to track your time with style."""
+        h = h.replace('%s', self.prog)
+        h = h.replace('%S', self.prog.title())
+        return h
+
+    def topic_what(self):
+        """a more complete description"""
+        h =\
+"""%s tracks time spent on tasks. To %s, a time entry comprises:
+
+- task name: do-something
+- start date-time: 2012-12-12T14:14:14
+- offset from UTC, appended to the date-time: -05:00
+- duration: PT3H4M5S, meaning 3 hours, 4 minutes, 5 seconds
+- optional comment: that took longer than expected
+
+The name is a single word. The comment is a single line of text.
+These are what you provide to `%s tasks add`.
+
+When you punch in, the start and UTC-offset get set.
+
+start is a local date-time. Local date-times don't mean much without
+a time zone, and time zones change. So instead of relying on local
+date-time, %s stores the offset at that moment from UTC. UTC is a
+universal timescale that uniquely identifies a point in time.
+
+Punch in pulls names and comments from the tasks file. When you select one,
+it sets its start and offset and writes it to the current file. When you
+punch out, it reads in the current task, computes the duration, and
+appends the time entry to the times file."""
+        h = h.replace('%s', self.prog)
+        return h
 
     def topic_files(self):
-        """Returns a help string."""
-        pass
+        """files and file formats"""
+        h =\
+"""# FILES
+%S only uses three files:
+
+- tasks -- task names and default comments
+- current -- the in-progress task with name, comment, and start time
+- times -- a record of all tasks punched in and out, including the time
+           clocked in on a specific task
+
+The files' location is determined by the PUNCH_DIR environment variable.
+The default value for PUNCH_DIR is $HOME/.punch.
+
+The first time you run %s, it creates PUNCH_DIR to store all your task
+and time info. It's hidden to keep it out of your way, but you should
+feel free to poke through it at any time -- %s intentionally keeps its
+files human-readable.
+
+# FORMATS
+tasks:
+
+    <name> / <comment>
+
+current and times:
+
+    <name> <date-time>/<duration> <comment>
+
+The tokens used in the format above are:
+
+    <name> = one or more non-whitespace characters
+    <comment> = zero or more non-newline characters
+
+    <date-time> = <year>-<month>-<day>T<hour>:<minute><offset>
+    <offset>= +<hour>:<minute> or -<hour>:<minute>
+
+    <duration> = PT<hour>H<minute>M<second>S
+        <hour>H is omitted if the duration is less than 1 hour.
+        <minute>M is omitted if the duration is less than 1 minute.
+
+    <year> = 4 decimal digits
+    <day>, <hour>, <minute> = 2 decimal digits"""
+        h = h.replace('%s', self.prog)
+        h = h.replace('%S', self.prog.title())
+        return h
 
     def topic_glob(self):
-        """Returns a help string."""
-        pass
+        """globs used by task list, task remove, times"""
+        h =\
+"""%s uses file-style globs to match tasks and comments. The syntax is
+straightforward:
+
+    *      matches any number of characters
+    ?      matches a single character
+    [...]  matches any character in between [ and ]
+    [!...] matches any character except those between [! and ]
+
+So given:
+
+    task-1 task-2 task-33
+
+The following patterns will match:
+
+    task-?    => task-1 task-2
+    task-*    => task-1 task-2 task-33
+    task-[12] => task-1 task-2
+    task-[!1] => task-2"""
+        h = h.replace('%s', self.prog)
+        return h
+
+    def topic_template(self):
+        """template syntax used by times --template option"""
+        return "under construction"
+
+    def topic_tips(self):
+        """non-obvious uses"""
+        h = """# Switch Out PUNCH_DIR
+Track your work-time and play-time separately by changing PUNCH_DIR:
+
+    PUNCH_DIR=~/.homepunch
+    %s tasks add party-hard social
+    %s tasks add study-hard mental
+    %s tasks add run-hard physical
+    PUNCH_DIR=~/.punch
+    %s tasks add file-tps-reports bigcorp"""
+        h = h.replace('%s', self.prog)
+        return h
 
 
 def main():
