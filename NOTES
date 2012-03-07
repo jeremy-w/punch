@@ -62,7 +62,11 @@ time zone, not in UTC.
 * Punch -- the tool, as an object
 
 ## TODO
-* Temporarily include just the fractional hours, total seconds in summary
+* Duration computation should convert to UTC.
 * Flesh out punch times to display just a range of results
+* Add nameglob to `tasks list`, default `*`.
+* Add --comment commentglob to `tasks list`.
+* Add --comment commentglob to `tasks remove`.
+    - If both name and commentglob are provided, AND the two lists.
 * Add templating to punch times
 * Drop the comment summary from times -- obsoleted by `punch times`.
