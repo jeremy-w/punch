@@ -490,35 +490,50 @@ class Punch(object):
 
         self.add_tasks_parser(subparsers)
         self.add_times_parser(subparsers)
-        in_parser = subparsers.add_parser('in')
+        in_parser = subparsers.add_parser('in',
+            help="punch in the named task; "
+            "if multiple tasks match, presents a list to choose from. "
+            "Punches out first if you're currently punched in.")
         in_parser.set_defaults(run=self.punch_in_glob)
         in_parser.add_argument('nameglob', nargs='?', type=unicode,
             help="the task to check in for - "
-            "multiple matches will be presented in a list;"
-            "omit to choose from all tasks."
+            "multiple matches will be presented in a list; "
+            "omit to choose from all tasks. "
             "If you are already punched in, you will be punched out first.")
 
-        out_parser = subparsers.add_parser('out')
+        out_parser = subparsers.add_parser('out',
+            help="punch out the current task")
         out_parser.set_defaults(run=self.punch_out)
+
+        self.help = Help(self.path, self.prog)
+        help_parser = subparsers.add_parser('help', help="detailed help")
+        help_parser.set_defaults(run=self.help.help_on_topics)
+        help_parser.add_argument('topic', nargs='*', type=unicode,
+            help="topics to list detailed help for - "
+            "omit to list all topics")
 
     def add_tasks_parser(self, subparsers):
         """Adds the parser tree responsible for handling
         `punch tasks` to |subparsers|.
         """
-        tasks_parser = subparsers.add_parser('tasks')
+        tasks_parser = subparsers.add_parser('tasks',
+            help='list, add, and remove tasks')
         tasks_parsers = tasks_parser.add_subparsers()
 
-        tasks_list_parser = tasks_parsers.add_parser('list')
+        tasks_list_parser = tasks_parsers.add_parser('list',
+            help='list all tasks matching nameglob (default *)')
         tasks_list_parser.set_defaults(run=self.tasks_list)
 
-        tasks_add_parser = tasks_parsers.add_parser('add')
+        tasks_add_parser = tasks_parsers.add_parser('add',
+            help='add a task')
         tasks_add_parser.set_defaults(run=self.tasks_add)
         tasks_add_parser.add_argument('name', type=unicode,
             help="the new task's name - any space will be replaced by '-'")
         tasks_add_parser.add_argument('comment', nargs='*', type=unicode,
             help="the new task's comment (one line)")
 
-        tasks_remove_parser = tasks_parsers.add_parser('remove')
+        tasks_remove_parser = tasks_parsers.add_parser('remove',
+            help='remove tasks matching nameglob')
         tasks_remove_parser.set_defaults(run=self.tasks_remove)
         tasks_remove_parser.add_argument('nameglob', nargs='+', type=unicode,
             help="the name of the task or tasks to remove")
@@ -682,6 +697,67 @@ class Punch(object):
         with io.open(self.path.tasks, 'w', encoding='utf-8') as f:
             TaskStream.write(f, *remainder)
         print u'%s: removed %d' % (self.prog, count)
+
+
+class Help(object):
+    def __init__(self, path, prog):
+        """Returns a new help object.
+
+        Path is used to list current settings.
+        Prog is used when referring to the program by name.
+        """
+        self.path = path
+        self.prog = prog
+        self.topics = [t[6:] for t in dir(self) if t.startswith('topic_')]
+
+    def help_on_topics(self, args):
+        """Help interface.
+
+        Prints help for args.topic list. If no topics, defaults to 'topics'.
+        """
+        requested = args.topic
+        valid = [t for t in requested if t in self.topics]
+        invalid = [t for t in requested if not t in valid]
+        if invalid:
+            splat = (self.prog, u' '.join(invalid))
+            print >>sys.stderr, u'%s: warning: topics do not exist: %s' % splat
+        if valid:
+            method_names = ['topic_' + topic for topic in valid]
+            for method_name in method_names:
+                bound_method = getattr(self, method_name)
+                print bound_method()
+        else:
+            print self.topic_topics()
+
+    def topic_topics(self):
+        """Returns a help string listing available topics."""
+        header = u"%s: available help topics:\n\n" % (self.prog)
+        footer = u"\nNew to %s? Check out walkthrough, concepts, and files."
+        footer = footer % (self.prog)
+        buf = StringIO()
+        buf.write(header)
+        for topic in self.topics:
+            buf.write(u'  %s\n' % topic)
+        buf.write(footer)
+        msg = buf.getvalue()
+        buf.close()
+        return msg
+
+    def topic_walkthrough(self):
+        """Returns a help string."""
+        pass
+
+    def topic_concepts(self):
+        """Returns a help string."""
+        pass
+
+    def topic_files(self):
+        """Returns a help string."""
+        pass
+
+    def topic_glob(self):
+        """Returns a help string."""
+        pass
 
 
 def main():
