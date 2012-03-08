@@ -582,43 +582,43 @@ class Punch(object):
             return
         count = len(matches)
 
-        buf = StringIO()
-        template = u'%%%dd: %%s\n' % (math.log(count, 10))
-        for i, task in enumerate(matches):
-            buf.write(template % (i + 1, task))
-        buf.write(u'%s: enter a number to select a task: '\
-            % (self.prog))
-        val = raw_input(buf.getvalue())
-        buf.close()
-
-        # validate val to get index
-        if not val:
-            print u'%s: aborted' % (self.prog)
-            return
         index = 0
-        try:
-            index = int(val) - 1
-        except ValueError:
-            print u'%s: error: not a number: %s' % (self.prog, val)
-            return
-        if not 0 <= index < count:
-            print u'%s: error: must select 1-%d, not %d'\
-                % (self.prog, count, index + 1)
+        if count > 1:
+            buf = StringIO()
+            template = u'%%%dd: %%s\n' % (math.log(count, 10))
+            for i, task in enumerate(matches):
+                buf.write(template % (i + 1, task))
+            buf.write(u'%s: enter a number to select a task: '\
+                % (self.prog))
+            val = raw_input(buf.getvalue())
+            buf.close()
+
+            # validate val to get index
+            if not val:
+                print u'%s: aborted' % (self.prog)
+                return
+            try:
+                index = int(val) - 1
+            except ValueError:
+                print u'%s: error: not a number: %s' % (self.prog, val)
+                return
+            if not 0 <= index < count:
+                print u'%s: error: must select 1-%d, not %d'\
+                    % (self.prog, count, index + 1)
+                return
 
         task = matches[index]
         current = self.core.current_task()
         if current:
             if task.name == current.name:
-                print u'%s: already punched in: %s'\
-                    % (self.prog, current)
+                print u'%s: already punched in: %s' % (self.prog, current)
                 return
             self.punch_out()
 
         task.start = datetime.now().replace(microsecond=0)
         task.tz = ISO.seconds_from_utc()
         self.core.write_task_to_path(task, self.path.current)
-        print u'%s: punched in: %s'\
-            % (self.prog, task)
+        print u'%s: punched in: %s' % (self.prog, task)
 
     def punch_out(self, args):
         """Appends the task from self.path.current to self.path.times
