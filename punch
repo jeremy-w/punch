@@ -229,6 +229,97 @@ class TaskTemplate(object):
         # TODO: Actually use template.
         return str(task)
 
+    class Token(object):
+        """Template token. Knows how to format itself given a task."""
+
+        def filter_builder_seconds(self, filt, mod):
+            # TODO: def _filter(self, task): per filt and mod, return _filter
+            pass
+
+        def filter_builder_datetime(self, filt, mod):
+            pass
+
+        known_properties = ['name', 'comment', 'duration', 'start', 'end']
+
+        filter_builder_for = {
+            'duration': filter_builder_seconds,
+            'start': filter_builder_datetime,
+            'end': filter_builder_datetime,
+        }
+
+        def __init__(self, string):
+            """Initializes a token corresponding to string.
+
+            String should look like {property|filter/modifier}, with
+            |filter and /modifier both optional.
+
+            Raises FormatError on bad format."""
+            if not string.startswith('{'):
+                e = FormatError("bad token: missing start delimiter {", string)
+                raise e
+            if not string.endswith('}'):
+                e = FormatError("bad token: missing end delimiter }", string)
+                raise e
+            string = string[1:-1]
+
+            prop, filt, mod = None, None, None
+            parts = string.split('|')
+            count = len(parts)
+            if count > 2:
+                e = FormatError("bad token: too many filters |", string)
+                raise e
+
+            prop = parts[0]
+            if not prop:
+                e = FormatError("bad token: no property name given", string)
+                raise e
+            if not prop in type(self).known_properties:
+                msg = "bad token: unknown property %s" % (prop)
+                e = FormatError(msg, string)
+                raise e
+            self.template_property = prop
+
+            has_filtmod = count == 2
+            if has_filtmod:
+                filtmod = parts[1]
+                parts = filtermod.split('/')
+                filt = parts[0]
+                if not filter:
+                    msg = "bad token: | but no filter name given"
+                    e = FormatError(msg, string)
+                    raise e
+                if len(parts) > 2:
+                    e = FormatError("bad token: too many modifiers /", string)
+                    raise e
+                elif len(parts) == 2:
+                    mod = parts[1]
+                    if not mod:
+                        msg = "bad token: / but no modifier name given"
+                        e = FormatError(msg, string)
+
+            filter_builder = None
+            try:
+                filter_builder = type(self).filter_builder_for[prop]
+            except KeyError:
+                msg = "bad token: property %s admits no filters" % (prop)
+                raise FormatError(msg, string)
+
+            try:
+                self.apply_filter = filter_builder(filt, mod)
+            except KeyError:
+                msg = "bad token: filter/modifier pair %s/%s nto recognized"
+                msg = msg % (filt, mod)
+                raise FormatError(msg, string)
+
+        def string_from_task(self, task):
+            """Returns a string corresponding to the template_property
+            formatted by this Token.
+            """
+            attr = self.template_property
+            val = getattr(task, attr)
+            result = self.apply_filter(val)
+            return result
+
 
 class ISO(object):
     """ISO handles conversion between formatted strings and
