@@ -618,9 +618,9 @@ class Punch(object):
         times_parser.add_argument('--template', '-t', type=unicode,
             metavar='TEMPLATE', help="format entries using TEMPLATE",
             default=' {name} ({comment})')
-        times_parser.add_argument('nameglob', nargs='?', type=unicode,
-            metavar='NAMEGLOB', help="list entries with matching names",
-            default='*')
+        times_parser.add_argument('nameglob', nargs='*', type=unicode,
+            metavar='NAMEGLOB',
+            help="list entries with matching names (default *)")
 
     def punch_in_glob(self, args):
         """Reduces args to a single task and calls punch_in(task)
@@ -799,6 +799,10 @@ class Punch(object):
             msg = u"%s: no times found - punch in, then punch out to add times"
             print msg % (self.prog)
             return
+
+        globs = args.nameglob
+        if globs:
+            tasks = self.core.tasks_matching_globs(tasks, globs)
 
         # FIXME: we need more lenient date-time parsing
         # At the very least, we need to allow just a date.

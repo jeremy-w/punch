@@ -96,7 +96,6 @@ time zone, not in UTC.
 * Punch -- the tool, as an object
 
 ## TODO
-* punch_times: add nameglob support
 * Add templated task formatter.
 * Fill out Help.topic_templates().
 * Add lenient date parser for punch times.
