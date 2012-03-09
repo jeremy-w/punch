@@ -96,12 +96,13 @@ time zone, not in UTC.
 * Punch -- the tool, as an object
 
 ## TODO
+* Switch to (start/tz, end/tz) range representation.
 * Add date -> range parser for punch times.
 * Add templated task formatter.
 * punch times:
     - before/after/on support using daterange parser
     - template support using TaskTemplate
 * Drop the comment summary from times -- obsoleted by `punch times`.
-* Document templates.
+* Fill out Help.topic_templates().
 * Add --comment commentglob to tasks list, tasks remove, times.
     - If both name and commentglob are provided, AND the two lists.
