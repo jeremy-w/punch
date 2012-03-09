@@ -59,7 +59,7 @@ Filters for duration (mutually exclusive):
 
 Modifier for duration:
 
-    5[udb]? -- rounding and precision control
+    \d[udb]? -- rounding and precision control
 
       number specifies the max number of digits after the decimal point
       udb are rounding modes - up, down, banker's
@@ -96,13 +96,10 @@ time zone, not in UTC.
 * Punch -- the tool, as an object
 
 ## TODO
-* Switch to (start/tz, end/tz) range representation.
-* Add date -> range parser for punch times.
+* punch_times: add nameglob support
 * Add templated task formatter.
-* punch times:
-    - before/after/on support using daterange parser
-    - template support using TaskTemplate
-* Drop the comment summary from times -- obsoleted by `punch times`.
 * Fill out Help.topic_templates().
+* Add lenient date parser for punch times.
+* Add Help.license()
 * Add --comment commentglob to tasks list, tasks remove, times.
     - If both name and commentglob are provided, AND the two lists.

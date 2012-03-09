@@ -45,11 +45,10 @@ class Task(object):
     Use TaskStream to read or write tasks.
     """
     def __init__(self, name, start=None, end=None, comment=u''):
-        self.name = unicode(name)
+        self.name = unicode(name) if name else None
         self.start = start
         self.end = end
         self.comment = unicode(comment) if comment else u''
-        self.is_comment = name is None
 
     @classmethod
     def comment(cls, comment):
@@ -88,6 +87,10 @@ class Task(object):
             end = ISO.pair_now()
         delta = ISO.pair_minus(end, self.start)
         return delta
+
+    @property
+    def is_comment(self):
+        return not self.name
 
 
 class TaskStream(object):
@@ -171,8 +174,8 @@ class TaskStream(object):
         endstr = match.group('end_or_duration')
         end = start
         if endstr.startswith('P'):
-            duration = ISO.duration_to_seconds(duration)
-            end[0] = start_dt + timedelta(seconds=duration)
+            duration = ISO.duration_to_seconds(endstr)
+            end = (start[0] + timedelta(seconds=duration), start[1])
         else:
             end = ISO.pair_from_string(endstr)
 
@@ -211,6 +214,20 @@ class TaskStream(object):
         else:
             string = cls.timeless_format % (name, comment)
         return string.strip()
+
+
+class TaskTemplate(object):
+    """Formats tasks per a template."""
+    def __init__(self, template=u"{name} {hours/1u} {comment}"):
+        """Initializes a formatter.
+
+        Raises FormatError on bad template.
+        """
+        self.template = template
+
+    def format(self, task):
+        # TODO: Actually use template.
+        return str(task)
 
 
 class ISO(object):
@@ -491,7 +508,7 @@ class Core(object):
         """Returns all tasks in path.
 
         If an error is raised, prints it to stderr and returns None."""
-        with io.open(self.path.tasks, 'r', encoding='utf-8') as f:
+        with io.open(path, 'r', encoding='utf-8') as f:
             tasks = []
             try:
                 tasks = TaskStream.read(f)
@@ -601,7 +618,7 @@ class Punch(object):
         times_parser.add_argument('--template', '-t', type=unicode,
             metavar='TEMPLATE', help="format entries using TEMPLATE",
             default=' {name} ({comment})')
-        times_parser.add_argument('nameglob', type=unicode,
+        times_parser.add_argument('nameglob', nargs='?', type=unicode,
             metavar='NAMEGLOB', help="list entries with matching names",
             default='*')
 
@@ -773,8 +790,62 @@ class Punch(object):
         The format used to print listed entries can be set using
         the --template option.
         """
-        pass
+        tasks = self.core.read_tasks(self.path.times)
+        if tasks is None:
+            return  # we already logged an error
+        tasks = [t for t in tasks if not t.is_comment]
+        if not tasks:
+            msg = u"%s: no times found - punch in, then punch out to add times"
+            print msg % (self.prog)
+            return
 
+        # FIXME: we need more lenient date-time parsing
+        # At the very least, we need to allow just a date.
+        # Perhaps add dependency on dateutil.parser?
+        # http://labix.org/python-dateutil
+        to_list = []
+        after = None
+        before = None
+        if args.on:
+            after = ISO.pair_from_string(args.on)
+            before = ISO.pair_from_string(args.on)
+        if args.after:
+            after = ISO.pair_from_string(args.after)
+        if args.before:
+            before = ISO.pair_from_string(args.before)
+        if not (after or before):
+            to_list = tasks
+        else:
+            after_utc = ISO.datetime_to_utc(*after) if after else None
+            before_utc = ISO.datetime_to_utc(*before) if before else None
+            for task in tasks:
+                start = task.start
+                end = task.end
+                start_utc = ISO.datetime_to_utc(*start)
+                end_utc = ISO.datetime_to_utc(*end)
+                excluded = (after_utc and end < after_utc
+                    or before_utc and before_utc < start)
+                if not excluded:
+                    to_list.append(task)
+
+        formatter = TaskTemplate()
+        if args.template:
+            formatter = TaskTemplate(args.template)
+
+        parts = [u"times"]
+        if after:
+            parts.append(u"after %s" % ISO.pair_to_string(after))
+        if after and before:
+            parts.append(u"and")
+        if before:
+            parts.append(u"before %s" % ISO.pair_to_string(before))
+        header = u' '.join(parts)
+        header = u''.join([header, u':'])
+        print header
+
+        for task in to_list:
+            line = formatter.format(task)
+            print line
 
 class Help(object):
     def __init__(self, path, prog):
