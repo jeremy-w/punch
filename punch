@@ -584,7 +584,7 @@ class Punch(object):
             help='list all tasks matching nameglob (default *)')
         tasks_list_parser.set_defaults(run=self.tasks_list)
         tasks_list_parser.add_argument('nameglob', nargs='*', type=unicode,
-            help="task name glob", default='*')
+            help="task name glob")
 
         tasks_add_parser = tasks_parsers.add_parser('add',
             help='add a task')
@@ -730,14 +730,15 @@ class Punch(object):
             return
 
         globs = args.nameglob
-        to_list = self.core.tasks_matching_globs(tasks, globs)
-        if not to_list:
+        if globs:
+            tasks = self.core.tasks_matching_globs(tasks, globs)
+        if not tasks:
             msg = u''.join([u'%s: no tasks found matching %s -- ',
                 'add some with `%s tasks add`'])
             globstr = u' '.join(globs)
             print msg % (self.prog, globstr, self.prog)
             return
-        for task in to_list:
+        for task in tasks:
             print unicode(task)
 
     def tasks_add(self, args):
