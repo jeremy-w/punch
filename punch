@@ -288,12 +288,12 @@ class TaskTemplate(object):
         """Template token. Knows how to format itself given a task."""
 
         seconds_modifier_regex = re.compile(r"""^(?P<fraction_digits> \d+ )
-            (?P<rounding_mode> [cub]? )$""", re.U|re.X)
+            (?P<rounding_mode> [nub]? )$""", re.U|re.X)
         def filter_builder_seconds(self, filt, mod):
             filt = filt and filt.strip()
             mod = mod and mod.strip()
             digits = 0
-            mode = 'u'
+            mode = 'n'
 
             if mod:
                 match = type(self).seconds_modifier_regex.match(mod)
@@ -305,14 +305,15 @@ class TaskTemplate(object):
                 digits = int(match.group('fraction_digits'))
                 mode = match.group('rounding_mode') or 'u'
 
-            def _round(seconds):
-                # if seconds is 3.75, digits is 1, then
+            def _round(number):
+                # if number is 3.75, digits is 1, then
                 # whole = 3, frac = 7, d = 0.5
-                whole = int(seconds)
-                frac, d = divmod((seconds % 1.0) * 10**digits, 1.0)
-                if mode == 'c' and d > 0:
+                number = float(number)
+                whole, frac = divmod(number, 1.0)
+                frac, d = divmod(frac * 10**digits, 1.0)
+                if mode == 'n' and d >= 0.5:
                     frac += 1
-                elif mode == 'u' and d >= 0.5:
+                elif mode == 'u' and d > 0.0:
                     frac += 1
                 elif mode == 'b':
                     if d > 0.5:

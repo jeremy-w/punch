@@ -59,12 +59,12 @@ Filters for duration (mutually exclusive):
 
 Modifier for duration:
 
-    \d[cub]? -- rounding and precision control
+    \d[nub]? -- rounding and precision control
 
       number specifies the max number of digits after the decimal point
-      udb are rounding modes - round any fraction beyond digits up
-      (ceiling), round 0.5 up, or round 0.5 to even (banker's).
-      default is up.
+      udb are rounding modes - round the 5 digits (u)p if the remainder >0,
+      round like (n)ormal (<0.5 down, >=0.5 up), or round 0.5 to even,
+      also known as (b)anker's rounding. Default is (n)ormal.
 
       affects only the seconds field with the clock filter
       ignored without a filter or with the lower filter
