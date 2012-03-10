@@ -67,6 +67,7 @@ Modifier for duration:
       default is up.
 
       affects only the seconds field with the clock filter
+      ignored without a filter or with the lower filter
 
 Filters for start/end:
 
