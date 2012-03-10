@@ -1252,7 +1252,7 @@ tasks:
 
 current and times:
 
-    <name> <date-time>/<duration> <comment>
+    <name> <date-time>/<date-time> <comment>
 
 The tokens used in the format above are:
 
@@ -1262,12 +1262,20 @@ The tokens used in the format above are:
     <date-time> = <year>-<month>-<day>T<hour>:<minute><offset>
     <offset>= +<hour>:<minute> or -<hour>:<minute>
 
-    <duration> = PT<hour>H<minute>M<second>S
+    <year> = 4 decimal digits
+    <day>, <hour>, <minute> = 2 decimal digits
+
+One format available to templates but no longer used in the file format
+is <duration>:
+
+     <duration> = PT<hour>H<minute>M<second>S
         <hour>H is omitted if the duration is less than 1 hour.
         <minute>M is omitted if the duration is less than 1 minute.
 
-    <year> = 4 decimal digits
-    <day>, <hour>, <minute> = 2 decimal digits"""
+The output of %s while you are clocked in uses an abbreviated version
+of this corresponding to the template {duration/lower}. To read more
+about templates, including a quick summary of the file format using the
+templating system, see `%s help template`."""
         h = h.replace('%s', self.prog)
         h = h.replace('%S', self.prog.title())
         return h
@@ -1275,7 +1283,7 @@ The tokens used in the format above are:
     def topic_glob(self):
         """globs used by task list, task remove, times"""
         h =\
-"""%s uses file-style globs to match tasks and comments. The syntax is
+"""%S uses file-style globs to match tasks and comments. The syntax is
 straightforward:
 
     *      matches any number of characters
@@ -1293,12 +1301,144 @@ The following patterns will match:
     task-*    => task-1 task-2 task-33
     task-[12] => task-1 task-2
     task-[!1] => task-2"""
+        h = h.replace('%S', self.prog.title())
         h = h.replace('%s', self.prog)
         return h
 
     def topic_template(self):
         """template syntax used by times --template option"""
-        return "under construction"
+        h = """%S allows you to control the reporting of times by providing
+a template string to the --template/-t option.
+
+# TEMPLATE FORMAT #
+A template is a string in which are embedded braced-tokens of the form:
+
+    {property|filter/modifier}
+
+# PROPERTIES #
+The available properties are:
+
+    name -- the name of the task
+    comment -- the comment associated with a clock-out
+    start -- the date-time at which you punched in
+    end -- the date-time at which you punched out
+    duration -- the seconds elapsed between the start and end times
+
+Of these, all but duration are directly represented in the times file.
+The duration is calculated from the recorded start and end timestamps.
+
+To read more about the format used in the times file, see:
+
+    %s help files
+
+# PROPERTY TYPES #
+The filters and modifiers available depend on the type of the property.
+The types and their properties:
+
+- string: name, comment
+- datetime: start, end
+- duration: duration
+
+## STRING ##
+No filters or modifiers have been supplied for string-valued properties.
+
+## DATETIME ##
+Date-time-valued properties have filters to extract the obvious
+components:
+
+    date -- only the date will be printed
+    time -- only the time will be printed
+
+Both of these filters drop the timezone information. The timezone used
+to represent the date and time default to the local timezone at the time
+the date-time was recorded. If you would rather use UTC, supply the
+modifier:
+
+    utc -- converts the date-time to UTC before applying the filter
+
+## DURATION ##
+Duration is the most complex type, in that there are more things you
+would like to do with it than perhaps any other type. %S has tried to
+strike a compromise: a few common formats are available as filters,
+and the precision and rounding mode of many of those formats can be
+adjusted using modifiers.
+
+The available filters are:
+
+    clock -- display as h:mm:ss.sss
+    hours -- display as fractional hours h.hhh
+    minutes -- display as fractional minutes m.mmm
+    seconds -- display as fractional seconds s.sss
+    lower -- display like the default, but lowercase and drop the PT
+       **NOTE:** any modifier to `lower` WILL be ignored
+             example: 3h5m30s -- 3 hours, 5 minutes, 30 seconds
+             (this is the format  %s uses to report elapsed time
+              when you run it without arguments while clocked in)
+
+Without a filter, a duration is displayed in ISO-8601 format:
+
+    PThHmMsS
+    example: PT3H5M30S for 3 hours, 5 minutes, 30 seconds
+
+As with the `lower` filter, the modifier will be ignored.
+
+The sole modifier allowed is a modifier *pattern*:
+
+    <frac-digits><optional-rounding-mode>
+
+where:
+
+    <frac-digits> = one or more decimal digits
+    <optional-rounding-mode> = one of the characters:
+
+        - n for (n)ormal -- less than 0.5 rounds down,
+                            greater than or equal to  0.5 rounds up
+        - u for (u)p -- greater than 0 rounds up
+        - b for (b)anker's -- less than 0.5 rounds down,
+                              greater than 0.5 rounds up,
+                              and equal to 0.5 rounds to the nearest
+                              even digit
+
+<frac-digits> specifies how many fractional digits should be used
+in the precision.
+
+The character specifies the rounding mode.
+
+So providing the value 1.2535 to the following modifiers would yield:
+
+    1.2535/1 or /1n -- 1.3 -- 1 fraction digit, round half up
+    1.2535/1u -- 1.3 -- 1 fraction digit, round up
+    1.2535/1b -- 1.2 -- 1 fraction digit, round half to even
+    1.2535/3b -- 1.254 -- 3 fraction digits, round half to even
+
+# EXAMPLES #
+%s while clocked in:
+
+    {duration/lower} {name} {comment}
+    1h5m4s playing-lost-pig this game is awesome!
+
+The current and times file format:
+
+    {name} {start}/{end} {comment}
+
+The times file format, but using UTC date-times instead of local:
+
+    {name} {start/utc}/{end/utc} {comment}
+
+The tasks file format:
+
+    {name} OR {name} / {comment}
+
+# NOTES #
+You will generally have to quote the template argument on the shell
+commandline.
+
+The templating facility is intended to make it easy to build your own
+output format to feed into a pipeline of commands or an external
+program. Go wild!"""
+        h = h.replace('%s', self.prog)
+        h = h.replace('%S', self.prog.title())
+        return h
 
     def topic_tips(self):
         """non-obvious uses"""
