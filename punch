@@ -218,26 +218,172 @@ class TaskStream(object):
 
 class TaskTemplate(object):
     """Formats tasks per a template."""
-    def __init__(self, template=u"{name} {hours/1u} {comment}"):
+    def __init__(self, template=u"{name} {duration/1u} {comment}"):
         """Initializes a formatter.
 
         Raises FormatError on bad template.
         """
         self.template = template
+        self.tokens = type(self).compile(self.template)
 
     def format(self, task):
-        # TODO: Actually use template.
-        return str(task)
+        with StringIO() as buf:
+            for token in self.tokens:
+                buf.write(token.format(task))
+            return buf.getvalue()
+
+    @classmethod
+    def compile(cls, string):
+        """Compiles the template string into a list of tokens."""
+        tokens = []
+        token_class = [cls.Token, cls.TemplateToken]
+        t = 0
+
+        def token(s, e, t):
+            chunk = string[s:e]
+            print 'token: %s' % (chunk)
+            s = e
+            tok = token_class[t](chunk)
+            t = 1 - t
+            return (s, tok, t)
+
+        level = 0  # {...} nesting level -- error if ever outside [0,1]
+        s = 0
+        for e, c in enumerate(string):
+            if c == '{':
+                level += 1
+                if level > 1:
+                    msg = "error: cannot nest template {token}s"
+                    raise FormatError(msg, string, e)
+                s, tok, t = token(s, e, t)
+                tokens.append(tok)
+            elif c == '}':
+                level -= 1
+                if level < 0:
+                    msg = 'error: "}" without matching "{"'
+                    raise FormatError(msg, string, i)
+                s, tok, t = token(s, e + 1, t)
+                tokens.append(tok)
+        if s != e:
+            tok, s, t = token(s, e, t)
+            tokens.append(tok)
+        return tokens
+
 
     class Token(object):
+        def __init__(self, string):
+            self.string = string
+
+        def format(self, task):
+            """Ignores task to return self.string."""
+            return self.string
+
+        def __str__(self):
+            return self.string
+
+        def __repr__(self):
+            return 'Token(%s)' % (self.string)
+
+    class TemplateToken(Token):
         """Template token. Knows how to format itself given a task."""
 
+        seconds_modifier_regex = re.compile(r"""^(?P<fraction_digits> \d+ )
+            (?P<rounding_mode> [cub]? )$""", re.U|re.X)
         def filter_builder_seconds(self, filt, mod):
-            # TODO: def _filter(self, task): per filt and mod, return _filter
-            pass
+            filt = filt.strip()
+            mod = mod.strip()
+            digits = 0
+            mode = 'u'
+
+            if mod:
+                match = type(self).seconds_modifier_regex.match(mod)
+                if not match:
+                    parts = ["bad duration modifier - "
+                    "expected one or more digits optionally followed by "
+                    "a rounding mode"]
+                    raise FormatError(parts[0], mod)
+                digits = int(match.group('fraction_digits'))
+                mode = match.group('rounding_mode') or 'u'
+
+            def _round(seconds):
+                # if seconds is 3.75, digits is 1, then
+                # whole = 3, frac = 7, d = 0.5
+                whole = int(seconds)
+                frac, d = divmod((seconds % 1.0) * 10**digits, 1.0)
+                if mode == 'c' and d > 0:
+                    frac += 1
+                elif mode == 'u' and d >= 0.5:
+                    frac += 1
+                elif mode == 'b':
+                    if d > 0.5:
+                        frac += 1
+                    elif d == 0.5:
+                        is_odd = (frac % 2) == 1
+                        if is_odd:
+                            frac += 1
+                frac = frac / (10**digits)
+                result = whole + frac
+                return result
+
+            if filt == 'clock':
+                def _filter(self, seconds):
+                    minutes, seconds = divmod(seconds, 60)
+                    hours, minutes = divmod(seconds, 60)
+                    seconds = _round(seconds)
+                    m = '%d:%02d:%02.' + digits + 'f'
+                    return m % (hours, minutes, seconds)
+            elif filt == 'hours':
+                def _filter(self, seconds):
+                    hours = _round(float(seconds) / 3600.0)
+                    m = '%0.' + digits + 'f'
+                    return m % (hours)
+            elif filt == 'minutes':
+                def _filter(self, seconds):
+                    minutes = _round(float(seconds) / 60.0)
+                    m = '%0.' + digits + 'f'
+                    return m % (minutes)
+            elif filt == 'seconds':
+                def _filter(self, seconds):
+                    seconds = _round(seconds)
+                    m = '%0.' + digits + 'f'
+                    return m % (seconds)
+            elif filt == 'lower':
+                def _filter(self, seconds):
+                    durstr = ISO.seconds_to_duration(seconds)
+                    return durstr.lower()
+            else:
+                raise FormatError("unknown duration filter", filt)
+            return _filter
 
         def filter_builder_datetime(self, filt, mod):
-            pass
+            wants_utc = False
+            if mod:
+                if mod != 'utc':
+                    msg = ['unknown datetime modifier - '
+                        'expected "utc" or nothing']
+                    raise FormatError(msg[0], mod)
+                wants_utc = True
+            if filt not in ['date', 'time']:
+                msg = ['unknown datetime filter - expected "date" or "time"'
+                    'or nothing']
+                raise FormatError(msg[0], filt)
+            def _filter(self, pair):
+                dt = pair[0]
+                offset = pair[1]
+                if wants_utc:
+                    dt = ISO.datetime_to_utc(dt, offset)
+                    offset = 0
+                isostring = ISO.pair_to_string(dt, offset)
+                date_end = len('YYYY-MM-dd')
+                time_start = date_end + 1
+                time_end = time_start + len('HH:mm:ss')
+                if filt == 'date':
+                    return isostring[:date_end]
+                elif filt == 'time':
+                    return isostring[time_start:time_end]
+                else:
+                    return isostring[0:time_end]
+            return _filter
 
         known_properties = ['name', 'comment', 'duration', 'start', 'end']
 
@@ -247,6 +393,9 @@ class TaskTemplate(object):
             'end': filter_builder_datetime,
         }
 
+        prop_filt_mod_regex = re.compile(r"""^ (?P<prop> [^|/]+ )
+            (?P<filt> | [^|/]+ )? (?P<mod> / [^|/]+ )? $""", re.X|re.U)
+
         def __init__(self, string):
             """Initializes a token corresponding to string.
 
@@ -254,6 +403,7 @@ class TaskTemplate(object):
             |filter and /modifier both optional.
 
             Raises FormatError on bad format."""
+            self.string = string
             if not string.startswith('{'):
                 e = FormatError("bad token: missing start delimiter {", string)
                 raise e
@@ -263,7 +413,7 @@ class TaskTemplate(object):
             string = string[1:-1]
 
             prop, filt, mod = None, None, None
-            parts = string.split('|')
+            #match = type(self).prop_filt_mod(regex).match(string)
             count = len(parts)
             if count > 2:
                 e = FormatError("bad token: too many filters |", string)
@@ -297,21 +447,21 @@ class TaskTemplate(object):
                         msg = "bad token: / but no modifier name given"
                         e = FormatError(msg, string)
 
-            filter_builder = None
-            try:
-                filter_builder = type(self).filter_builder_for[prop]
-            except KeyError:
-                msg = "bad token: property %s admits no filters" % (prop)
-                raise FormatError(msg, string)
+                filter_builder = None
+                try:
+                    filter_builder = type(self).filter_builder_for[prop]
+                except KeyError:
+                    msg = "template property %s admits no filters" % (prop)
+                    raise FormatError(msg, string)
 
-            try:
-                self.apply_filter = filter_builder(filt, mod)
-            except KeyError:
-                msg = "bad token: filter/modifier pair %s/%s nto recognized"
-                msg = msg % (filt, mod)
-                raise FormatError(msg, string)
+                try:
+                    self.apply_filter = filter_builder(filt, mod)
+                except KeyError:
+                    msg = "template filter/modifier pair %s/%s not recognized"
+                    msg = msg % (filt, mod)
+                    raise FormatError(msg, string)
 
-        def string_from_task(self, task):
+        def format(self, task):
             """Returns a string corresponding to the template_property
             formatted by this Token.
             """
