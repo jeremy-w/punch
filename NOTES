@@ -102,10 +102,8 @@ time zone, not in UTC.
 * Punch -- the tool, as an object
 
 ## TODO
-* Add templated task formatter.
 * Fill out Help.topic_templates().
 * Add lenient date parser for punch times.
-* Remove punch times header line once date range filtering for sure works.
 * Add Help.license()
 * Add --comment commentglob to tasks list, tasks remove, times.
     - If both name and commentglob are provided, AND the two lists.
