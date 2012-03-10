@@ -227,10 +227,12 @@ class TaskTemplate(object):
         self.tokens = type(self).compile(self.template)
 
     def format(self, task):
-        with StringIO() as buf:
-            for token in self.tokens:
-                buf.write(token.format(task))
-            return buf.getvalue()
+        buf = StringIO()
+        for token in self.tokens:
+            buf.write(token.format(task))
+        val = buf.getvalue()
+        buf.close()
+        return val
 
     @classmethod
     def compile(cls, string):
@@ -238,11 +240,9 @@ class TaskTemplate(object):
         tokens = []
         token_class = [cls.Token, cls.TemplateToken]
         t = 0
-        print 'compiling [%s]' % (string)
 
         def token(s, e, t):
             chunk = string[s:e]
-            print 'token: [%s]' % (chunk)
             s = e
             tok = token_class[t](chunk)
             t = 1 - t
@@ -265,9 +265,8 @@ class TaskTemplate(object):
                     raise FormatError(msg, string, i)
                 s, tok, t = token(s, e + 1, t)
                 tokens.append(tok)
-        if s != e:
-            tok, s, t = token(s, e, t)
-            tokens.append(tok)
+        s, tok, t = token(s, len(string), t)
+        tokens.append(tok)
         return tokens
 
 
@@ -331,22 +330,22 @@ class TaskTemplate(object):
                     minutes, seconds = divmod(seconds, 60)
                     hours, minutes = divmod(seconds, 60)
                     seconds = _round(seconds)
-                    m = '%d:%02d:%02.' + digits + 'f'
+                    m = '%d:%02d:%02.' + str(digits) + 'f'
                     return m % (hours, minutes, seconds)
             elif filt == 'hours':
                 def _filter(self, seconds):
                     hours = _round(float(seconds) / 3600.0)
-                    m = '%0.' + digits + 'f'
+                    m = '%0.' + str(digits) + 'f'
                     return m % (hours)
             elif filt == 'minutes':
                 def _filter(self, seconds):
                     minutes = _round(float(seconds) / 60.0)
-                    m = '%0.' + digits + 'f'
+                    m = '%0.' + str(digits) + 'f'
                     return m % (minutes)
             elif filt == 'seconds':
                 def _filter(self, seconds):
                     seconds = _round(seconds)
-                    m = '%0.' + digits + 'f'
+                    m = '%0.' + str(digits) + 'f'
                     return m % (seconds)
             elif not filt:
                 def _filter(self, seconds):
@@ -355,7 +354,7 @@ class TaskTemplate(object):
             elif filt == 'lower':
                 def _filter(self, seconds):
                     durstr = ISO.seconds_to_duration(seconds)
-                    return durstr.lower()
+                    return durstr[2:].lower()
             else:
                 raise FormatError("unknown duration filter", filt)
             return _filter
@@ -368,7 +367,7 @@ class TaskTemplate(object):
                         'expected "utc" or nothing']
                     raise FormatError(msg[0], mod)
                 wants_utc = True
-            if filt not in ['date', 'time']:
+            if filt and filt not in ['date', 'time']:
                 msg = ['unknown datetime filter - expected "date" or "time"'
                     'or nothing']
                 raise FormatError(msg[0], filt)
@@ -393,6 +392,8 @@ class TaskTemplate(object):
         known_properties = ['name', 'comment', 'duration', 'start', 'end']
 
         filter_builder_for = {
+            'name': None,
+            'comment': None,
             'duration': filter_builder_seconds,
             'start': filter_builder_datetime,
             'end': filter_builder_datetime,
@@ -434,21 +435,15 @@ class TaskTemplate(object):
 
             filt = match.group('filt')
             mod = match.group('mod')
-            has_filtmod = filt or mod
-            if has_filtmod:
-                filter_builder = None
-                try:
-                    filter_builder = type(self).filter_builder_for[prop]
-                except KeyError:
-                    msg = "template property %s admits no filters" % (prop)
-                    raise FormatError(msg, string)
-
-                try:
-                    self.apply_filter = filter_builder(self, filt, mod)
-                except KeyError:
-                    msg = "template filter/modifier pair %s/%s not recognized"
-                    msg = msg % (filt, mod)
-                    raise FormatError(msg, string)
+            filter_builder = type(self).filter_builder_for[prop]
+            if filter_builder:
+                self.apply_filter = filter_builder(self, filt, mod)
+            elif filt or mod:
+                msg = "template property %s admits neither filter nor modifier"
+                msg = msg % (prop)
+                raise FormatError(msg, string)
+            else:
+                self.apply_filter = lambda self, val: unicode(val)
 
         def format(self, task):
             """Returns a string corresponding to the template_property
@@ -456,7 +451,7 @@ class TaskTemplate(object):
             """
             attr = self.template_property
             val = getattr(task, attr)
-            result = self.apply_filter(val)
+            result = self.apply_filter(self, val)
             return result
 
 
@@ -567,11 +562,17 @@ class ISO(object):
         minute, second = divmod(seconds, 60)
         hour, minute = divmod(minute, 60)
         parts = [u"PT"]
-        if hour: parts.append(u"%02dH" % hour)
-        if minute: parts.append(u"%02dM" % minute)
+        fmt = "%d"
+        altfmt = "%02d"
+        if hour:
+            parts += [fmt % hour, u'H']
+            fmt = altfmt
+        if minute:
+            parts += [fmt % minute, u'M']
+            fmt = altfmt
         # We have to have at least one unit, so ensure that there's at least
         # seconds, even if it's just 00S.
-        parts.append(u"%02dS" % second)
+        parts += [fmt % second, u'S']
         return u"".join(parts)
 
     @staticmethod
@@ -845,9 +846,10 @@ class Punch(object):
             metavar='DATETIME', help="list entries during or before DATETIME")
         times_parser.add_argument('--on', '-o', type=unicode,
             metavar='DATETIME', help="list entries during DATETIME")
+        # use clock because it's fixed-width, which looks good in a list
         times_parser.add_argument('--template', '-t', type=unicode,
             metavar='TEMPLATE', help="format entries using TEMPLATE",
-            default=' {name} ({comment})')
+            default='{duration|clock} {name} ({comment})')
         times_parser.add_argument('nameglob', nargs='*', type=unicode,
             metavar='NAMEGLOB',
             help="list entries with matching names (default *)")
@@ -963,9 +965,9 @@ class Punch(object):
         if globs:
             tasks = self.core.tasks_matching_globs(tasks, globs)
         if not tasks:
-            msg = u''.join([u'%s: no tasks found matching %s -- ',
-                'add some with `%s tasks add`'])
-            globstr = u' '.join(globs)
+            msg = [u'%s: no tasks found matching "%s" -- '
+                'add some with `%s tasks add`'][0]
+            globstr = u'" "'.join(globs)
             print msg % (self.prog, globstr, self.prog)
             return
         for task in tasks:
@@ -1033,6 +1035,11 @@ class Punch(object):
         globs = args.nameglob
         if globs:
             tasks = self.core.tasks_matching_globs(tasks, globs)
+            if not tasks:
+                msg = u'%s: no times found matching "%s"'
+                msg = msg % (self.prog, u'" "'.join(globs))
+                print msg
+                return
 
         # FIXME: we need more lenient date-time parsing
         # At the very least, we need to allow just a date.
@@ -1048,6 +1055,7 @@ class Punch(object):
             after = ISO.pair_from_string(args.after)
         if args.before:
             before = ISO.pair_from_string(args.before)
+
         if not (after or before):
             to_list = tasks
         else:
@@ -1063,10 +1071,7 @@ class Punch(object):
                 if not excluded:
                     to_list.append(task)
 
-        t = args.template
-        formatter = TaskTemplate(t) if t else TaskTemplate()
-
-        parts = [u"times"]
+        parts = [u"all times"] if tasks else [u"no matching times found"]
         if after:
             parts.append(u"after %s" % ISO.pair_to_string(after))
         if after and before:
@@ -1074,9 +1079,15 @@ class Punch(object):
         if before:
             parts.append(u"before %s" % ISO.pair_to_string(before))
         header = u' '.join(parts)
-        header = u''.join([header, u':'])
-        print header
+        if tasks:
+            header = header + u':'
+            print header
+        else:
+            print header
+            return
 
+        t = args.template
+        formatter = TaskTemplate(t) if t else TaskTemplate()
         for task in to_list:
             line = formatter.format(task)
             print line
