@@ -55,14 +55,16 @@ Filters for duration (mutually exclusive):
     minutes -- display as minutes 9.999
     seconds -- display as seconds 999
     lower -- display as ptHHhMMmSSs -- like in file, but lowercase
-        (which I find easier to read, since the number stick out more)
+        (which I find easier to read, since the numbers stick out more)
 
 Modifier for duration:
 
-    \d[udb]? -- rounding and precision control
+    \d[cub]? -- rounding and precision control
 
       number specifies the max number of digits after the decimal point
-      udb are rounding modes - up, down, banker's
+      udb are rounding modes - round any fraction beyond digits up
+      (ceiling), round 0.5 up, or round 0.5 to even (banker's).
+      default is up.
 
       affects only the seconds field with the clock filter
 
