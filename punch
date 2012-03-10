@@ -238,10 +238,11 @@ class TaskTemplate(object):
         tokens = []
         token_class = [cls.Token, cls.TemplateToken]
         t = 0
+        print 'compiling [%s]' % (string)
 
         def token(s, e, t):
             chunk = string[s:e]
-            print 'token: %s' % (chunk)
+            print 'token: [%s]' % (chunk)
             s = e
             tok = token_class[t](chunk)
             t = 1 - t
@@ -290,8 +291,8 @@ class TaskTemplate(object):
         seconds_modifier_regex = re.compile(r"""^(?P<fraction_digits> \d+ )
             (?P<rounding_mode> [cub]? )$""", re.U|re.X)
         def filter_builder_seconds(self, filt, mod):
-            filt = filt.strip()
-            mod = mod.strip()
+            filt = filt and filt.strip()
+            mod = mod and mod.strip()
             digits = 0
             mode = 'u'
 
@@ -347,6 +348,10 @@ class TaskTemplate(object):
                     seconds = _round(seconds)
                     m = '%0.' + digits + 'f'
                     return m % (seconds)
+            elif not filt:
+                def _filter(self, seconds):
+                    durstr = ISO.seconds_to_duration(seconds)
+                    return durstr
             elif filt == 'lower':
                 def _filter(self, seconds):
                     durstr = ISO.seconds_to_duration(seconds)
@@ -393,8 +398,10 @@ class TaskTemplate(object):
             'end': filter_builder_datetime,
         }
 
-        prop_filt_mod_regex = re.compile(r"""^ (?P<prop> [^|/]+ )
-            (?P<filt> | [^|/]+ )? (?P<mod> / [^|/]+ )? $""", re.X|re.U)
+        prop_filt_mod_regex = re.compile(r"""^
+            (?P<prop> [^|/]+ )
+            (?: \| (?P<filt> [^|/]+ ))?
+            (?:  / (?P<mod>  [^|/]+ ))? $""", re.X|re.U)
 
         def __init__(self, string):
             """Initializes a token corresponding to string.
@@ -413,40 +420,22 @@ class TaskTemplate(object):
             string = string[1:-1]
 
             prop, filt, mod = None, None, None
-            #match = type(self).prop_filt_mod(regex).match(string)
-            count = len(parts)
-            if count > 2:
-                e = FormatError("bad token: too many filters |", string)
-                raise e
+            match = type(self).prop_filt_mod_regex.match(string)
+            if not match:
+                msg = ["bad token: format does not match any of {prop}, "
+                    "{prop|filt}, {prop|filt/mod}, or {prop/mod}"]
+                raise FormatError(msg[0], self.string)
 
-            prop = parts[0]
-            if not prop:
-                e = FormatError("bad token: no property name given", string)
-                raise e
+            prop = match.group('prop')
             if not prop in type(self).known_properties:
                 msg = "bad token: unknown property %s" % (prop)
-                e = FormatError(msg, string)
-                raise e
+                raise FormatError(msg, self.string)
             self.template_property = prop
 
-            has_filtmod = count == 2
+            filt = match.group('filt')
+            mod = match.group('mod')
+            has_filtmod = filt or mod
             if has_filtmod:
-                filtmod = parts[1]
-                parts = filtermod.split('/')
-                filt = parts[0]
-                if not filter:
-                    msg = "bad token: | but no filter name given"
-                    e = FormatError(msg, string)
-                    raise e
-                if len(parts) > 2:
-                    e = FormatError("bad token: too many modifiers /", string)
-                    raise e
-                elif len(parts) == 2:
-                    mod = parts[1]
-                    if not mod:
-                        msg = "bad token: / but no modifier name given"
-                        e = FormatError(msg, string)
-
                 filter_builder = None
                 try:
                     filter_builder = type(self).filter_builder_for[prop]
@@ -455,7 +444,7 @@ class TaskTemplate(object):
                     raise FormatError(msg, string)
 
                 try:
-                    self.apply_filter = filter_builder(filt, mod)
+                    self.apply_filter = filter_builder(self, filt, mod)
                 except KeyError:
                     msg = "template filter/modifier pair %s/%s not recognized"
                     msg = msg % (filt, mod)
@@ -1074,9 +1063,8 @@ class Punch(object):
                 if not excluded:
                     to_list.append(task)
 
-        formatter = TaskTemplate()
-        if args.template:
-            formatter = TaskTemplate(args.template)
+        t = args.template
+        formatter = TaskTemplate(t) if t else TaskTemplate()
 
         parts = [u"times"]
         if after:
