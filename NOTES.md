@@ -1,6 +1,7 @@
+# Notes
 <!-- vi: set et ts=4 sw=4 -->
 ## Desired Interface
-name-glob below means a name optionally including '*' for any chars and
+name-glob below means a name optionally including '\*' for any chars and
 '?' for a single char. '\' is an escape character. (used fnmatch)
 
     punch tasks list
@@ -15,9 +16,10 @@ Python -- see [aliases for positional arguments (subparsers)][aliases].
   [aliases]: http://bugs.python.org/issue9234
 
 Or set a default subcommand when none is provided?
-Yes, scan the args yourself and stick in the default. Yuck. **
+Yes, scan the args yourself and stick in the default. Yuck.**
 
     punch in name-glob
+
 list tasks matching, or if just 1, declare it; no task lists all to choose from
 
     punch out comment
@@ -61,6 +63,12 @@ Template tokens: see `punch help template`.
 
      * Actually, this is already in `punch help what`, but probably bears
        repeating.
+
+* Add this to the TIPS file:
+
+    * Allow marking tasks as done so they are excluded from the punch-in task
+      list.  (They still need to be there for the summaries to work.)
+
 * Add Help.license()
 * Add --comment commentglob to tasks list, tasks remove, times.
     - If both name and commentglob are provided, AND the two lists.
