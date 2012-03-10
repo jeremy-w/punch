@@ -29,59 +29,7 @@ What should punch times do, anyway? How about easy summary/selective listing?
     punch times --after DATE --before DATE --on DATE
     punch times --template 'name: {name}'
 
-Template tokens:
-
-    {name}
-    {comment}
-    {duration} -- duration in ISO format (PThhHmmMssS)
-    {start} -- start date-time
-    {end} -- end date-time -- approximate, assumes no time zone shift
-        throughout duration
-
-The approximate end time problem suggests we drop the start/duration format
-and shift to a start/end format, since we can embed time info in *both* of
-those. That does mean we will need to plumb another tzoffset into Task and
-change out our formatting. It might be time to move to (dt, tz) pairs rather
-than keeping them entirely separate.
-
-Syntax:
-
-    {token|filter/modifier}
-
-Filters for duration (mutually exclusive):
-
-    clock -- display as hh:mm:ss
-    hours -- display as hours 9.999
-    minutes -- display as minutes 9.999
-    seconds -- display as seconds 999
-    lower -- display as ptHHhMMmSSs -- like in file, but lowercase
-        (which I find easier to read, since the numbers stick out more)
-
-Modifier for duration:
-
-    \d[nub]? -- rounding and precision control
-
-      number specifies the max number of digits after the decimal point
-      udb are rounding modes - round the 5 digits (u)p if the remainder >0,
-      round like (n)ormal (<0.5 down, >=0.5 up), or round 0.5 to even,
-      also known as (b)anker's rounding. Default is (n)ormal.
-
-      affects only the seconds field with the clock filter
-      ignored without a filter or with the lower filter
-
-Filters for start/end:
-
-    date -- just date
-    time -- just time
-
-Modifier for start/end:
-
-    utc -- convert to UTC before displaying date/time
-
-This highlights that we cannot recover local time info from UTC, but we can
-recover UTC from local time info + offset. We will move to that instead.
-It's also more convenient, since the user (naturally) works in their local
-time zone, not in UTC.
+Template tokens: see `punch help template`.
 
 ## New Arch
 * Task -- name, start, duration, comment
@@ -102,8 +50,17 @@ time zone, not in UTC.
 * Punch -- the tool, as an object
 
 ## TODO
-* Fill out Help.topic_templates().
+* Pipe help output through a pager when it exceeds a certain number of lines,
+  say 18.
+* Test the punch times date functionality.
 * Add lenient date parser for punch times.
+* Explain why we represent the duration as local-start/local-end rather than
+  using UTC or start/duration in the format help. (Short version: we can't
+  reconstruct the local start/end times from any other representation, but
+  local->UTC is easy, and date-time - date-time is also easy.)
+
+     * Actually, this is already in `punch help what`, but probably bears
+       repeating.
 * Add Help.license()
 * Add --comment commentglob to tasks list, tasks remove, times.
     - If both name and commentglob are provided, AND the two lists.
