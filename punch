@@ -494,6 +494,108 @@ class ISO(object):
         return seconds
 
     @classmethod
+    def pair_from_userstring(cls, string):
+        """Returns datetime and UTC offset in seconds corresponding to a
+        user-provided string.
+
+        Handles relative date names (yesterday, today, tomorrow, N days
+        ago) and fills in timezone and time info as needed.
+
+        Raises FormatError if the string cannot be parsed."""
+        string = string.strip()
+        if not string:
+            raise FormatError("no text provided", string)
+
+        zeroes = {'hour': 0, 'minute': 0, 'second': 0, 'microsecond':0}
+        now = cls.pair_now()
+        dt, offset = now
+
+        # Handle relative dates.
+        if string == 'now':
+            return now
+
+        zdt = dt.replace(**zeroes)
+        if string == 'today':
+            return (zdt, offset)
+        if string == 'tomorrow':
+            return (zdt + timedelta(days=1), offset)
+        if string == 'yesterday':
+            return (zdt + timedelta(days=-1), offset)
+
+        # N years/days/hours ago/from now
+        if string.endswith('ago') or string.endswith('from now'):
+            is_past = string.endswith('ago')
+            time_string = string
+            if is_past:
+                time_string = string.rstrip('ago')
+            else:
+                time_string = string.rstrip('from now')
+            time_string = time_string.strip()
+
+            # days or hours; anything larger is iffy
+            words = time_string.split()
+            m = "expected N (days/hours) (ago/from now)"
+            if not len(words) == 2:
+                raise FormatError(m, string)
+
+            count = words[0]
+            try:
+                count = float(count)
+            except ValueError as e:
+                n = "failed to parse count \"%s\": %s" % (words[0], e)
+                raise FormatError(u"\n".join([n, m]), string)
+
+            delta = None
+            s = words[1][0]
+            if s == u'd':
+                delta = timedelta(days=count)
+            elif s == u'h':
+                secs = 3600.0 * count
+                delta = timedelta(seconds=secs)
+            else:
+                n = "unit must be (d)ays or (h)ours, not \"%s\"" % (words[1])
+                raise FormatError(u"\n".join([n, m]), string)
+
+            if is_past:
+                return (dt - delta, offset)
+            return (dt + delta, offset)
+
+        # Handle under-specified dates.
+        # Guess 0h0m0s, use current UTC offset
+        m = "expected date YYYY-MM-DD"
+        parts = string.split('-')
+        count = len(parts)
+        if count < 2 or count > 3:
+            parts = string.split('/')
+            count = len(parts)
+        if count < 2 or count > 3:
+            raise FormatError(m, string)
+        if count == 3:
+            if len(parts[0]) == 4:
+                year = int(parts[0])
+                month = int(parts[1])
+                day = int(parts[2])
+                return (zdt.replace(year=year, month=month, day=day), offset)
+            elif len(parts[2]) == 4:
+                day = int(parts[0])
+                month = int(parts[1])
+                year = int(parts[2])
+                return (zdt.replace(year=year, month=month, day=day), offset)
+            raise FormatError(m, string)
+
+        # year/month or month/year
+        if len(parts[0]) == 4:
+            year = int(parts[0])
+            month = int(parts[1])
+            return (zdt.replace(year=year, month=month, day=1), offset)
+        if len(parts[1]) == 4:
+            month = int(parts[0])
+            year = int(parts[1])
+            return (zdt.replace(year=year, month=month, day=1), offset)
+        m = "expected YYYY-MM-DD or YYYY-MM (day defaults to 1)"
+        raise FormatError(m, string)
+
+    @classmethod
     def pair_from_string(cls, isostring):
         """Returns the datetime and UTC offset in seconds
         corresponding to an ISO-8601 date-time string.
@@ -1051,15 +1153,15 @@ class Punch(object):
         after = None
         before = None
         if args.on:
-            (dt, offset) = ISO.pair_from_string(args.on)
+            (dt, offset) = ISO.pair_from_userstring(args.on)
             start = dt.replace(hour=0, minute=0, second=0, microsecond=0)
             end = start + timedelta(days=1)
             after = (start, offset)
             before = (end, offset)
         if args.after:
-            after = ISO.pair_from_string(args.after)
+            after = ISO.pair_from_userstring(args.after)
         if args.before:
-            before = ISO.pair_from_string(args.before)
+            before = ISO.pair_from_userstring(args.before)
 
         if not (after or before):
             to_list = tasks
