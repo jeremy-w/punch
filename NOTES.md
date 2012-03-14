@@ -1,5 +1,5 @@
 # Notes
-<!-- vi: set et ts=4 sw=4 -->
+<!-- vi: set et ts=4 sw=4 : -->
 ## Desired Interface
 name-glob below means a name optionally including '\*' for any chars and
 '?' for a single char. '\' is an escape character. (used fnmatch)
@@ -54,7 +54,6 @@ Template tokens: see `punch help template`.
 ## TODO
 * Pipe help output through a pager when it exceeds a certain number of lines,
   say 18.
-* Test the punch times date functionality.
 * Add lenient date parser for punch times.
 * Explain why we represent the duration as local-start/local-end rather than
   using UTC or start/duration in the format help. (Short version: we can't
@@ -66,9 +65,11 @@ Template tokens: see `punch help template`.
 
 * Add this to the TIPS file:
 
-    * Allow marking tasks as done so they are excluded from the punch-in task
-      list.  (They still need to be there for the summaries to work.)
+    * Mark tasks as done so they are excluded from the punch-in task
+      list by removing them from your tasks file. The entries in times
+      will be unaffected.
 
 * Add Help.license()
+* Integrate more of the README content into `punch help`.
 * Add --comment commentglob to tasks list, tasks remove, times.
     - If both name and commentglob are provided, AND the two lists.
