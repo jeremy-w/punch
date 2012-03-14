@@ -52,8 +52,6 @@ Template tokens: see `punch help template`.
 * Punch -- the tool, as an object
 
 ## TODO
-* Pipe help output through a pager when it exceeds a certain number of lines,
-  say 18.
 * Add lenient date parser for punch times.
 * Explain why we represent the duration as local-start/local-end rather than
   using UTC or start/duration in the format help. (Short version: we can't
