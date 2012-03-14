@@ -25,6 +25,7 @@ import fnmatch
 import io
 import math
 import os
+import pydoc
 import re
 from StringIO import StringIO
 import shutil
@@ -1120,9 +1121,12 @@ class Help(object):
             print >>sys.stderr, u'%s: warning: topics do not exist: %s' % splat
         if valid:
             method_names = ['topic_' + topic for topic in valid]
+            buf = StringIO()
             for method_name in method_names:
                 bound_method = getattr(self, method_name)
-                print bound_method()
+                print >>buf, bound_method()
+            pydoc.pager(buf.getvalue())
+            buf.close()
         else:
             print self.topic_topics()
 
