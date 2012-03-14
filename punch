@@ -1050,8 +1050,11 @@ class Punch(object):
         after = None
         before = None
         if args.on:
-            after = ISO.pair_from_string(args.on)
-            before = ISO.pair_from_string(args.on)
+            (dt, offset) = ISO.pair_from_string(args.on)
+            start = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = start + timedelta(days=1)
+            after = (start, offset)
+            before = (end, offset)
         if args.after:
             after = ISO.pair_from_string(args.after)
         if args.before:
@@ -1067,18 +1070,18 @@ class Punch(object):
                 end = task.end
                 start_utc = ISO.datetime_to_utc(*start)
                 end_utc = ISO.datetime_to_utc(*end)
-                excluded = (after_utc and end < after_utc
-                    or before_utc and before_utc < start)
+                excluded = (after_utc and end_utc < after_utc
+                    or before_utc and before_utc < start_utc)
                 if not excluded:
                     to_list.append(task)
 
         parts = [u"all times"] if tasks else [u"no matching times found"]
         if after:
-            parts.append(u"after %s" % ISO.pair_to_string(after))
+            parts.append(u"after %s" % ISO.pair_to_string(*after))
         if after and before:
             parts.append(u"and")
         if before:
-            parts.append(u"before %s" % ISO.pair_to_string(before))
+            parts.append(u"before %s" % ISO.pair_to_string(*before))
         header = u' '.join(parts)
         if tasks:
             header = header + u':'
