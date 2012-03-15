@@ -36,7 +36,7 @@ Template tokens: see `punch help template`.
 ## New Arch
 * Task -- name, start, duration, comment
 
-    ^(\S+)\s*([^/]+)/(\S+)\s*(.+)$
+      ^(\S+)\s*([^/]+)/(\S+)\s*(.+)$
 
 * TaskStream -- skips comment and blank lines
     - read(fileobj)
@@ -52,22 +52,20 @@ Template tokens: see `punch help template`.
 * Punch -- the tool, as an object
 
 ## TODO
-* Document date-parsing used with punch times. `topic_time`?
+* Update the README example output
 * Add this to the TIPS file:
 
     * Mark tasks as done so they are excluded from the punch-in task
       list by removing them from your tasks file. The entries in times
       will be unaffected.
-
 * Add Help.license()
+* Document date-parsing used with punch times. `topic_time`?
+
+    - Explain why we represent the duration as local-start/local-end rather
+      than using UTC or start/duration in the format help. (Short version: we
+      can't reconstruct the local start/end times from any other
+      representation, but local->UTC is easy, and date-time - date-time is also
+      easy.)
 * Integrate more of the README content into `punch help`.
-* Explain why we represent the duration as local-start/local-end rather than
-  using UTC or start/duration in the format help. (Short version: we can't
-  reconstruct the local start/end times from any other representation, but
-  local->UTC is easy, and date-time - date-time is also easy.)
-
-     * Actually, this is already in `punch help what`, but probably bears
-       repeating.
-
 * Add --comment commentglob to tasks list, tasks remove, times.
     - If both name and commentglob are provided, AND the two lists.
