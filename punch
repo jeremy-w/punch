@@ -330,7 +330,7 @@ class TaskTemplate(object):
             if filt == 'clock':
                 def _filter(self, seconds):
                     minutes, seconds = divmod(seconds, 60)
-                    hours, minutes = divmod(seconds, 60)
+                    hours, minutes = divmod(minutes, 60)
                     seconds = _round(seconds)
                     m = '%d:%02d:%02.' + str(digits) + 'f'
                     return m % (hours, minutes, seconds)
