@@ -52,6 +52,10 @@ Template tokens: see `punch help template`.
 * Punch -- the tool, as an object
 
 ## TODO
+* Allow `punch` to accept a template for the current time formatting.
+* {start}, {end} tokens should include the tz, and we should have a |tz filter
+  to dump just the tz portion of the date.
+* Use templating system for printing tasks throughout.
 * Add this to the TIPS file:
 
     * Mark tasks as done so they are excluded from the punch-in task
