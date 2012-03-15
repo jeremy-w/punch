@@ -1,47 +1,61 @@
-% export PUNCH_DIR="$HOME/.punch-tmp"
-% punch-in   
-punch-in: no tasks found
-% cat >~/.punch-tmp/tasks
-SomeTask 1234 whatever comment you want - maybe the project name
-Task2 112 The number is an issue_id. Steal it from your issue tracker.
-DoSomething 42 Death March
-% punch-in 
-select a task:
-0: SomeTask (whatever comment you want - maybe the project name)
-1: Task2 (The number is an issue_id. Steal it from your issue tracker.)
-2: DoSomething (Death March)
-2
-% ls ~/.punch-tmp 
+% export PUNCH_DIR=~/.punch-tmp
+% punch in
+punch: no tasks found -- add some with `punch tasks add`
+% punch tasks add task-name default comment for this task\'s time entries
+punch: added task: task-name / default comment for this task's time entries
+% punch tasks add other:1234 task names are just one word
+punch: added task: other:1234 / task names are just one word
+% punch tasks add work:101 but feel free to embed an external issue_id
+punch: added task: work:101 / but feel free to embed an external issue_id
+% punch tasks add client-name/project-name/task-name or entire hierarchy
+punch: added task: client-name/project-name/task-name / or entire hierarchy
+% punch in
+1: task-name (default comment for this task's time entries)
+2: other:1234 (task names are just one word)
+3: work:101 (but feel free to embed an external issue_id)
+4: client-name/project-name/task-name (or entire hierarchy)
+punch: enter a number to select a task: 1
+punch: punched in: 0m01s task-name (default comment for this task's time entries)
+% ls $PUNCH_DIR
 current  tasks
-% cat ~/.punch-tmp/current 
-42 1330810079
-% punch-now
-punch-now: DoSomething/42 (Death March) - 0:00:31
-% punch-in 
-select a task:
-0: SomeTask (whatever comment you want - maybe the project name)
-1: Task2 (The number is an issue_id. Steal it from your issue tracker.)
-2: DoSomething (Death March)
-1
-punch-out: DoSomething/42 (Death March) - 0:00:47
-% punch-now
-punch-now: Task2/112 (The number is an issue_id. Steal it from your issue tracker.) - 0:00:08
-% cat ~/.punch-tmp/current 
-112 1330810121
-% punch-out
-punch-out: Task2/112 (The number is an issue_id. Steal it from your issue tracker.) - 0:00:15
-% punch-now     
-punch-now: no current task
-% ls ~/.punch-tmp 
-tasks      timesheet
-% cat ~/.punch-tmp/timesheet 
-# DoSomething/42 (Death March)
-42 1330810079 1330810126
+% cat "$PUNCH_DIR/current"
+task-name 2012-03-14T20:33:29-04:00/2012-03-14T20:33:29-04:00 default comment for this task's time entries
+% cat "$PUNCH_DIR/tasks"
+task-name / default comment for this task's time entries
+other:1234 / task names are just one word
+work:101 / but feel free to embed an external issue_id
+client-name/project-name/task-name / or entire hierarchy
+% punch
+punch: current task: 1m29s task-name (default comment for this task's time entries)
+% punch out that was fast
+punch: punched out: 1m38s task-name (that was fast)
+% ls "$PUNCH_DIR"
+tasks  times
+% cat "$PUNCH_DIR/times"
+task-name 2012-03-14T20:33:29-04:00/2012-03-14T20:35:06-04:00 that was fast
+#^ 0.03 h = 98 s
+% punch times
+all times:
+2012-03-14 0:01:37 task-name (default comment for this task's time entries)
+% punch times --on today --template '{duration|hours/1u} {name} {start|time}-{end|time}'
+all times after 2012-03-14T00:00:00-04:00 and before 2012-03-15T00:00:00-04:00:
+2012-03-14 0.1 task-name 20:33:29-20:35:06
+% punch in 'work*'
+punch: punched in: 0m01s work:101 (but feel free to embed an external issue_id)
+% punch
+punch: current task: 0m05s work:101 (but feel free to embed an external issue_id)
+% punch out
+punch: punched out: 0m09s work:101 (but feel free to embed an external issue_id)
+% punch help
+punch: available help topics:
 
-# Task2/112 (The number is an issue_id. Steal it from your issue tracker.)
-112 1330810121 1330810136
+  files -- files and file formats
+  glob -- globs used by task list, task remove, times
+  template -- template syntax used by times --template option
+  tips -- non-obvious uses
+  topics -- you're reading it now
+  walkthrough -- basic setup and use
+  what -- a more complete description
 
-% punch-summary
-2012-03-03 0.5 112 Task2 (The number is an issue_id. Steal it from your issue tracker.)
-2012-03-03 0.5 42 DoSomething (Death March)
+New to punch? Check out walkthrough, concepts, and files.
 % unset PUNCH_DIR
