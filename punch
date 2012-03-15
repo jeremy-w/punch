@@ -959,7 +959,7 @@ class Punch(object):
         # use clock because it's fixed-width, which looks good in a list
         times_parser.add_argument('--template', '-t', type=unicode,
             metavar='TEMPLATE', help="format entries using TEMPLATE",
-            default='{duration|clock} {name} ({comment})')
+            default='{start|date} {duration|clock} {name} ({comment})')
         times_parser.add_argument('nameglob', nargs='*', type=unicode,
             metavar='NAMEGLOB',
             help="list entries with matching names (default *)")
