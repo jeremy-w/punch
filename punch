@@ -754,6 +754,7 @@ class Path(object):
         If root is None, uses PUNCH_DIR.
         """
         self.root = root if root else type(self).PUNCH_DIR
+        self.root = os.path.expanduser(self.root)
         self.tasks = os.path.join(self.root, tasks)
         self.times = os.path.join(self.root, times)
         self.current = os.path.join(self.root, current)
@@ -843,6 +844,8 @@ class Core(object):
         """Returns all tasks in path.
 
         If an error is raised, prints it to stderr and returns None."""
+        if not os.path.exists(path):
+            return []
         with io.open(path, 'r', encoding='utf-8') as f:
             tasks = []
             try:
