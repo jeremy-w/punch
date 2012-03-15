@@ -52,7 +52,6 @@ Template tokens: see `punch help template`.
 * Punch -- the tool, as an object
 
 ## TODO
-* Update the README example output
 * Add this to the TIPS file:
 
     * Mark tasks as done so they are excluded from the punch-in task
