@@ -892,7 +892,7 @@ class Punch(object):
         current_parser.add_argument('--template', '-t', type=unicode,
             metavar='TEMPLATE', help="format current task using TEMPLATE",
             default=self.current_task_template)
-        self.parser.set_defaults(run=self.punch_current)
+        current_parser.set_defaults(run=self.punch_current)
 
         self.add_tasks_parser(subparsers)
         self.add_times_parser(subparsers)
