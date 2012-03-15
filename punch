@@ -886,6 +886,14 @@ class Punch(object):
 
         self.core = Core(path)
 
+        self.current_task_template = '{duration|lower} {name} ({comment})'
+        current_parser = subparsers.add_parser('current',
+            help="list the currently punched-in task")
+        current_parser.add_argument('--template', '-t', type=unicode,
+            metavar='TEMPLATE', help="format current task using TEMPLATE",
+            default=self.current_task_template)
+        self.parser.set_defaults(run=self.punch_current)
+
         self.add_tasks_parser(subparsers)
         self.add_times_parser(subparsers)
         in_parser = subparsers.add_parser('in',
@@ -1056,18 +1064,24 @@ class Punch(object):
     def handle(self, args):
         """Handles args as if provided on the commandline."""
         if not args:
-            self.list_current()
-            return
+            args = ["current"]
+        elif args[0].startswith('-t') or args[0].startswith('--t'):
+            # check explicitly for --t to avoid hijacking --help
+            # would be better if we could avoid repeating the
+            # --template arg here
+            args.insert(0, "current")
         args = self.parser.parse_args(args)
         args.run(args)
 
-    def list_current(self):
+    def punch_current(self, args):
         """Lists the current task.
 
         This is the default behavior when invoked with no args."""
         task = self.core.current_task()
         if task:
-            print u'%s: current task: %s' % (self.prog, task)
+            template = TaskTemplate(args.template)
+            entry = template.format(task)
+            print u'%s: current task: %s' % (self.prog, entry)
         else:
             print u'%s: no current task' % (self.prog)
 
