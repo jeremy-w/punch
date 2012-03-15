@@ -901,6 +901,9 @@ class Punch(object):
 
         out_parser = subparsers.add_parser('out',
             help="punch out the current task")
+        out_parser.add_argument('comment', nargs='*', type=unicode,
+            help="comment to use for this time entry -- leave empty to use the"
+            "task's default comment")
         out_parser.set_defaults(run=self.punch_out)
 
         self.help = Help(self.path, self.prog)
@@ -1026,6 +1029,12 @@ class Punch(object):
         if not task:
             print u'%s: no current task to punch out' % (self.prog)
             return
+
+        if args.comment:
+            c = u" ".join(args.comment)
+            c = c.strip()
+            if c:
+                task.comment = c
 
         # We follow the task with a comment containing
         # the local date, hours (rounded to the half-hour), and total seconds.
